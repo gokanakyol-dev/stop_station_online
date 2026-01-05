@@ -10,6 +10,8 @@ const output = document.getElementById('output');
 const comparisonCard = document.getElementById('comparisonCard');
 const comparisonResults = document.getElementById('comparisonResults');
 
+const btnDownloadStops = document.getElementById('btnDownloadStops');
+
 // State
 let gpsRecords = [];
 let stops = [];
@@ -673,6 +675,312 @@ btnClear.addEventListener('click', () => {
 });
 
 log('✅ Hazır. CSV ve durak JSON yükleyin.');
+
+// Tespit edilen durakları CSV olarak indir
+function downloadDetectedStopsCSV() {
+  if (!pipelineResult?.stops?.detectedStops || pipelineResult.stops.detectedStops.length === 0) {
+    alert('Önce pipeline çalıştırılmalı ve tespit edilen durak olmalı!');
+    return;
+  }
+  const stops = pipelineResult.stops.detectedStops;
+  // CSV başlıkları
+  const headers = ['sequenceNumber','name','lat','lon','distanceAlongRoute','distanceToRoute'];
+  const csvRows = [headers.join(',')];
+  for (const s of stops) {
+    csvRows.push([
+      s.sequenceNumber,
+      '"' + (s.name || s.id || '') + '"',
+      s.lat,
+      s.lon,
+      s.distanceAlongRoute,
+      s.distanceToRoute
+    ].join(','));
+  }
+  const csvContent = csvRows.join('\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'tespit_edilen_duraklar.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+if (btnDownloadStops) {
+  btnDownloadStops.addEventListener('click', downloadDetectedStopsCSV);
+}
+
+// ==========================================
+// HAT VE DURAK YÖNETİMİ
+// ==========================================
+
+const API_BASE = '';  // Aynı origin
+let allRoutes = [];
+let allStops = [];
+
+// Tab sistemi
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(btn.dataset.tab).classList.add('active');
+  });
+});
+
+// Hatları yükle
+async function loadRoutes() {
+  const routesList = document.getElementById('routesList');
+  const routeSearch = document.getElementById('routeSearch');
+  
+  try {
+    routesList.innerHTML = '<p class="loading-text">Yükleniyor...</p>';
+    const res = await fetch(`${API_BASE}/api/routes`);
+    const data = await res.json();
+    allRoutes = data.routes || [];
+    
+    // Select'leri güncelle
+    updateRouteSelects();
+    renderRoutes(allRoutes);
+  } catch (err) {
+    routesList.innerHTML = `<p class="no-data">Hatalar yüklenemedi: ${err.message}</p>`;
+  }
+}
+
+function renderRoutes(routes) {
+  const routesList = document.getElementById('routesList');
+  
+  if (routes.length === 0) {
+    routesList.innerHTML = '<p class="no-data">Hat bulunamadı</p>';
+    return;
+  }
+  
+  routesList.innerHTML = routes.map(r => `
+    <div class="item-row" data-id="${r.id}">
+      <span class="item-badge">${r.route_number}</span>
+      <div class="item-info">
+        <div class="item-name">${r.route_name}</div>
+        <div class="item-meta">ID: ${r.id}</div>
+      </div>
+      <div class="item-actions">
+        <button class="btn-danger btn-sm" onclick="deleteRoute(${r.id})">🗑️</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function updateRouteSelects() {
+  const selects = [
+    document.getElementById('stopRouteFilter'),
+    document.getElementById('newStopRoute')
+  ];
+  
+  selects.forEach(select => {
+    if (!select) return;
+    const currentVal = select.value;
+    const isFilter = select.id === 'stopRouteFilter';
+    
+    select.innerHTML = isFilter ? '<option value="">Tüm Hatlar</option>' : '<option value="">Hat Seç</option>';
+    allRoutes.forEach(r => {
+      select.innerHTML += `<option value="${r.id}">${r.route_number} - ${r.route_name}</option>`;
+    });
+    select.value = currentVal;
+  });
+}
+
+// Hat arama
+document.getElementById('routeSearch')?.addEventListener('input', (e) => {
+  const q = e.target.value.toLowerCase();
+  const filtered = allRoutes.filter(r => 
+    r.route_number.toLowerCase().includes(q) || 
+    r.route_name.toLowerCase().includes(q)
+  );
+  renderRoutes(filtered);
+});
+
+// Hat ekleme formu
+document.getElementById('btnAddRoute')?.addEventListener('click', () => {
+  document.getElementById('addRouteForm').style.display = 'block';
+  document.getElementById('btnAddRoute').style.display = 'none';
+});
+
+document.getElementById('btnCancelRoute')?.addEventListener('click', () => {
+  document.getElementById('addRouteForm').style.display = 'none';
+  document.getElementById('btnAddRoute').style.display = 'block';
+  document.getElementById('newRouteNumber').value = '';
+  document.getElementById('newRouteName').value = '';
+});
+
+document.getElementById('btnSaveRoute')?.addEventListener('click', async () => {
+  const number = document.getElementById('newRouteNumber').value.trim();
+  const name = document.getElementById('newRouteName').value.trim();
+  
+  if (!number || !name) {
+    alert('Hat numarası ve adı gerekli!');
+    return;
+  }
+  
+  try {
+    const res = await fetch(`${API_BASE}/api/routes`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ route_number: number, route_name: name })
+    });
+    
+    if (!res.ok) throw new Error('Hat eklenemedi');
+    
+    document.getElementById('btnCancelRoute').click();
+    loadRoutes();
+    log(`✅ Hat eklendi: ${number} - ${name}`);
+  } catch (err) {
+    alert('Hata: ' + err.message);
+  }
+});
+
+// Hat silme
+window.deleteRoute = async function(id) {
+  if (!confirm('Bu hattı silmek istediğinize emin misiniz? Tüm durakları da silinecek!')) return;
+  
+  try {
+    const res = await fetch(`${API_BASE}/api/routes/${id}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error('Hat silinemedi');
+    loadRoutes();
+    loadStops();
+    log(`✅ Hat silindi: ID ${id}`);
+  } catch (err) {
+    alert('Hata: ' + err.message);
+  }
+};
+
+// Durakları yükle
+async function loadStops() {
+  const stopsList = document.getElementById('stopsList');
+  
+  try {
+    stopsList.innerHTML = '<p class="loading-text">Yükleniyor...</p>';
+    const res = await fetch(`${API_BASE}/api/stops/all`);
+    const data = await res.json();
+    allStops = data.stops || [];
+    renderStops(allStops);
+  } catch (err) {
+    stopsList.innerHTML = `<p class="no-data">Duraklar yüklenemedi: ${err.message}</p>`;
+  }
+}
+
+function renderStops(stopsData) {
+  const stopsList = document.getElementById('stopsList');
+  const routeFilter = document.getElementById('stopRouteFilter')?.value;
+  const dirFilter = document.getElementById('stopDirectionFilter')?.value;
+  
+  let filtered = stopsData;
+  if (routeFilter) filtered = filtered.filter(s => s.route_id == routeFilter);
+  if (dirFilter) filtered = filtered.filter(s => s.direction === dirFilter);
+  
+  if (filtered.length === 0) {
+    stopsList.innerHTML = '<p class="no-data">Durak bulunamadı</p>';
+    return;
+  }
+  
+  // Sadece ilk 100 durak göster
+  const display = filtered.slice(0, 100);
+  
+  stopsList.innerHTML = display.map(s => {
+    const route = allRoutes.find(r => r.id === s.route_id);
+    const routeNum = route?.route_number || '?';
+    const badgeClass = s.direction === 'gidis' ? 'badge-gidis' : 'badge-donus';
+    
+    return `
+      <div class="item-row" data-id="${s.id}">
+        <span class="item-badge">${routeNum}</span>
+        <span class="item-badge ${badgeClass}">${s.direction === 'gidis' ? 'G' : 'D'}</span>
+        <div class="item-info">
+          <div class="item-name">${s.name}</div>
+          <div class="item-meta">${s.lat?.toFixed(6)}, ${s.lon?.toFixed(6)}</div>
+        </div>
+        <div class="item-actions">
+          <button class="btn-danger btn-sm" onclick="deleteStop(${s.id})">🗑️</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+  
+  if (filtered.length > 100) {
+    stopsList.innerHTML += `<p class="no-data">+${filtered.length - 100} durak daha...</p>`;
+  }
+}
+
+// Durak filtreleri
+document.getElementById('stopRouteFilter')?.addEventListener('change', () => renderStops(allStops));
+document.getElementById('stopDirectionFilter')?.addEventListener('change', () => renderStops(allStops));
+
+// Durak ekleme formu
+document.getElementById('btnAddStop')?.addEventListener('click', () => {
+  document.getElementById('addStopForm').style.display = 'block';
+  document.getElementById('btnAddStop').style.display = 'none';
+});
+
+document.getElementById('btnCancelStop')?.addEventListener('click', () => {
+  document.getElementById('addStopForm').style.display = 'none';
+  document.getElementById('btnAddStop').style.display = 'block';
+  document.getElementById('newStopName').value = '';
+  document.getElementById('newStopLat').value = '';
+  document.getElementById('newStopLon').value = '';
+});
+
+document.getElementById('btnSaveStop')?.addEventListener('click', async () => {
+  const route_id = document.getElementById('newStopRoute').value;
+  const direction = document.getElementById('newStopDirection').value;
+  const name = document.getElementById('newStopName').value.trim();
+  const lat = parseFloat(document.getElementById('newStopLat').value);
+  const lon = parseFloat(document.getElementById('newStopLon').value);
+  
+  if (!route_id || !name || isNaN(lat) || isNaN(lon)) {
+    alert('Tüm alanları doldurun!');
+    return;
+  }
+  
+  try {
+    const res = await fetch(`${API_BASE}/api/stops`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ route_id: parseInt(route_id), direction, name, lat, lon })
+    });
+    
+    if (!res.ok) throw new Error('Durak eklenemedi');
+    
+    document.getElementById('btnCancelStop').click();
+    loadStops();
+    log(`✅ Durak eklendi: ${name}`);
+  } catch (err) {
+    alert('Hata: ' + err.message);
+  }
+});
+
+// Durak silme
+window.deleteStop = async function(id) {
+  if (!confirm('Bu durağı silmek istediğinize emin misiniz?')) return;
+  
+  try {
+    const res = await fetch(`${API_BASE}/api/stops/${id}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error('Durak silinemedi');
+    loadStops();
+    log(`✅ Durak silindi: ID ${id}`);
+  } catch (err) {
+    alert('Hata: ' + err.message);
+  }
+};
+
+// Yenile butonu
+document.getElementById('btnRefreshRoutes')?.addEventListener('click', () => {
+  loadRoutes();
+  loadStops();
+});
+
+// Sayfa yüklenince verileri çek
+loadRoutes();
+loadStops();
 
 // Console'da yardım göster
 console.log('%c🚏 Stop Station - Terminal API Hazır', 'color: #10b981; font-size: 14px; font-weight: bold');

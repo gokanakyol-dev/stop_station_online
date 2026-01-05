@@ -14,6 +14,76 @@
       <p>GPS verisinden otobüs durağı tespiti</p>
     </header>
 
+    <!-- HAT YÖNETİMİ - YENİ BÖLÜM -->
+    <div class="card">
+      <h2>🚌 Hat ve Durak Yönetimi</h2>
+      
+      <div class="tabs">
+        <button class="tab-btn active" data-tab="routes-tab">Hatlar</button>
+        <button class="tab-btn" data-tab="stops-tab">Duraklar</button>
+      </div>
+
+      <div id="routes-tab" class="tab-content active">
+        <div class="management-header">
+          <input type="text" id="routeSearch" placeholder="Hat ara..." class="search-input">
+          <button id="btnRefreshRoutes" class="btn-icon" title="Yenile">🔄</button>
+        </div>
+        
+        <div id="routesList" class="items-list">
+          <p class="loading-text">Hatlar yükleniyor...</p>
+        </div>
+        
+        <div class="add-form" id="addRouteForm" style="display: none;">
+          <h4>➕ Yeni Hat Ekle</h4>
+          <input type="text" id="newRouteNumber" placeholder="Hat No (örn: 103)">
+          <input type="text" id="newRouteName" placeholder="Hat Adı (örn: Konak - Karşıyaka)">
+          <div class="form-buttons">
+            <button id="btnSaveRoute" class="btn-primary btn-sm">💾 Kaydet</button>
+            <button id="btnCancelRoute" class="btn-secondary btn-sm">İptal</button>
+          </div>
+        </div>
+        
+        <button id="btnAddRoute" class="btn-success btn-block">➕ Yeni Hat Ekle</button>
+      </div>
+
+      <div id="stops-tab" class="tab-content">
+        <div class="management-header">
+          <select id="stopRouteFilter" class="select-input">
+            <option value="">Tüm Hatlar</option>
+          </select>
+          <select id="stopDirectionFilter" class="select-input">
+            <option value="">Tüm Yönler</option>
+            <option value="gidis">Gidiş</option>
+            <option value="donus">Dönüş</option>
+          </select>
+        </div>
+        
+        <div id="stopsList" class="items-list">
+          <p class="loading-text">Duraklar yükleniyor...</p>
+        </div>
+        
+        <div class="add-form" id="addStopForm" style="display: none;">
+          <h4>➕ Yeni Durak Ekle</h4>
+          <select id="newStopRoute" class="select-input">
+            <option value="">Hat Seç</option>
+          </select>
+          <select id="newStopDirection" class="select-input">
+            <option value="gidis">Gidiş</option>
+            <option value="donus">Dönüş</option>
+          </select>
+          <input type="text" id="newStopName" placeholder="Durak Adı">
+          <input type="number" id="newStopLat" placeholder="Enlem" step="0.000001">
+          <input type="number" id="newStopLon" placeholder="Boylam" step="0.000001">
+          <div class="form-buttons">
+            <button id="btnSaveStop" class="btn-primary btn-sm">💾 Kaydet</button>
+            <button id="btnCancelStop" class="btn-secondary btn-sm">İptal</button>
+          </div>
+        </div>
+        
+        <button id="btnAddStop" class="btn-success btn-block">➕ Yeni Durak Ekle</button>
+      </div>
+    </div>
+
     <div class="card">
       <h2>📂 Veri Yükleme</h2>
       <div class="form-group">
@@ -50,6 +120,7 @@
     <div class="card">
       <h2>🗺️ Harita</h2>
       <div id="map"></div>
+        <button id="btnDownloadStops" class="btn-secondary" style="margin-top: 16px;">⬇️ Tespit Edilen Durakları İndir (CSV)</button>
     </div>
 
     <div class="card" id="comparisonCard" style="display: none;">

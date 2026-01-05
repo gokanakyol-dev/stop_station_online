@@ -1,0 +1,293 @@
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  FlatList,
+  TouchableOpacity,
+  StyleSheet,
+  ActivityIndicator,
+  Alert,
+  TextInput
+} from 'react-native';
+import { getRoutes } from '../services/api';
+
+export default function RouteSelectionScreen({ navigation }) {
+  const [routes, setRoutes] = useState([]);
+  const [filteredRoutes, setFilteredRoutes] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedRoute, setSelectedRoute] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  useEffect(() => {
+    loadRoutes();
+  }, []);
+
+  useEffect(() => {
+    if (searchQuery.trim() === '') {
+      setFilteredRoutes(routes);
+    } else {
+      const q = searchQuery.toLowerCase();
+      const filtered = routes.filter(r => 
+        r.route_number.toLowerCase().includes(q) ||
+        r.route_name.toLowerCase().includes(q)
+      );
+      setFilteredRoutes(filtered);
+    }
+  }, [searchQuery, routes]);
+
+  const loadRoutes = async () => {
+    try {
+      setLoading(true);
+      const data = await getRoutes();
+      setRoutes(data);
+      setFilteredRoutes(data);
+    } catch (error) {
+      const status = error?.response?.status;
+      const serverMsg = error?.response?.data?.error;
+      const fallbackMsg = error?.message;
+
+      const message = serverMsg
+        ? `${serverMsg}${status ? ` (HTTP ${status})` : ''}`
+        : (status ? `Sunucu hatası (HTTP ${status}).` : null) ||
+          fallbackMsg ||
+          'Hatlar yüklenemedi.';
+
+      Alert.alert('Hata', message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const selectDirection = (route, direction) => {
+    navigation.navigate('FieldMap', {
+      routeId: route.id,
+      routeNumber: route.route_number,
+      routeName: route.route_name,
+      direction: direction
+    });
+  };
+
+  const renderRouteItem = ({ item }) => (
+    <View style={styles.routeCard}>
+      <TouchableOpacity
+        style={styles.routeHeader}
+        onPress={() => {
+          if (selectedRoute?.id === item.id) {
+            setSelectedRoute(null);
+          } else {
+            setSelectedRoute(item);
+          }
+        }}
+      >
+        <View style={styles.routeNumber}>
+          <Text style={styles.routeNumberText}>{item.route_number}</Text>
+        </View>
+        <Text style={styles.routeName}>{item.route_name}</Text>
+      </TouchableOpacity>
+
+      {selectedRoute?.id === item.id && (
+        <View style={styles.directionButtons}>
+          {item.directions?.gidis && (
+            <TouchableOpacity
+              style={[styles.directionButton, styles.gidisButton]}
+              onPress={() => selectDirection(item, 'gidis')}
+            >
+              <Text style={styles.directionButtonText}>→ GİDİŞ</Text>
+            </TouchableOpacity>
+          )}
+          {item.directions?.donus && (
+            <TouchableOpacity
+              style={[styles.directionButton, styles.donusButton]}
+              onPress={() => selectDirection(item, 'donus')}
+            >
+              <Text style={styles.directionButtonText}>← DÖNÜŞ</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
+    </View>
+  );
+
+  if (loading) {
+    return (
+      <View style={styles.centered}>
+        <ActivityIndicator size="large" color="#007AFF" />
+        <Text style={styles.loadingText}>Hatlar yükleniyor...</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.title}>DURAK DOĞRULAMA</Text>
+        <Text style={styles.subtitle}>Hat ve yön seçin</Text>
+      </View>
+
+      <View style={styles.searchContainer}>
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Hat ara... (numara veya isim)"
+          placeholderTextColor="#999"
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+        />
+        {searchQuery.length > 0 && (
+          <TouchableOpacity 
+            style={styles.clearButton}
+            onPress={() => setSearchQuery('')}
+          >
+            <Text style={styles.clearButtonText}>✕</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
+      <FlatList
+        data={filteredRoutes}
+        keyExtractor={(item) => item.id.toString()}
+        renderItem={renderRouteItem}
+        contentContainerStyle={styles.listContent}
+        refreshing={loading}
+        onRefresh={loadRoutes}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>
+              {searchQuery ? 'Sonuç bulunamadı' : 'Hat bulunamadı'}
+            </Text>
+          </View>
+        }
+      />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#F5F5F5'
+  },
+  centered: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F5F5F5'
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#666'
+  },
+  header: {
+    backgroundColor: '#007AFF',
+    padding: 20,
+    paddingTop: 60,
+    paddingBottom: 24
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    marginBottom: 4
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#FFFFFF',
+    opacity: 0.9
+  },
+  searchContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#FFFFFF',
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E5E5'
+  },
+  searchInput: {
+    flex: 1,
+    backgroundColor: '#F5F5F5',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 10,
+    fontSize: 16,
+    color: '#333'
+  },
+  clearButton: {
+    marginLeft: 10,
+    padding: 8
+  },
+  clearButtonText: {
+    fontSize: 18,
+    color: '#999'
+  },
+  emptyContainer: {
+    padding: 40,
+    alignItems: 'center'
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#999'
+  },
+  listContent: {
+    padding: 16
+  },
+  routeCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    marginBottom: 12,
+    overflow: 'hidden',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4
+  },
+  routeHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16
+  },
+  routeNumber: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#007AFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16
+  },
+  routeNumberText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#FFFFFF'
+  },
+  routeName: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333'
+  },
+  directionButtons: {
+    flexDirection: 'row',
+    padding: 12,
+    paddingTop: 0,
+    gap: 12
+  },
+  directionButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 8,
+    alignItems: 'center'
+  },
+  gidisButton: {
+    backgroundColor: '#34C759'
+  },
+  donusButton: {
+    backgroundColor: '#FF9500'
+  },
+  directionButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#FFFFFF'
+  }
+});

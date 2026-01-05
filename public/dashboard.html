@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Saha Kontrol Paneli - Stop Station</title>
+  <link rel="stylesheet" href="css/dashboard.css">
+</head>
+<body>
+  <div class="dashboard-container">
+    <!-- Başlık -->
+    <header class="dashboard-header">
+      <h1>📊 SAHA KONTROL PANELİ</h1>
+      <p>Sahadan gelen durak doğrulama verileri</p>
+    </header>
+
+    <!-- Filtre paneli -->
+    <div class="filter-panel">
+      <div class="filter-group">
+        <label>Hat:</label>
+        <select id="routeFilter">
+          <option value="">Tüm Hatlar</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label>Yön:</label>
+        <select id="directionFilter">
+          <option value="">Tümü</option>
+          <option value="gidis">Gidiş</option>
+          <option value="donus">Dönüş</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label>İşlem:</label>
+        <select id="actionFilter">
+          <option value="">Tümü</option>
+          <option value="APPROVE">Onaylanan</option>
+          <option value="REJECT">Reddedilen</option>
+          <option value="ADD">Eklenen</option>
+        </select>
+      </div>
+
+      <button id="refreshBtn" class="refresh-btn">🔄 Yenile</button>
+    </div>
+
+    <!-- İstatistikler -->
+    <div class="stats-grid">
+      <div class="stat-card stat-approve">
+        <div class="stat-number" id="statApprove">0</div>
+        <div class="stat-label">Onaylanan</div>
+      </div>
+      
+      <div class="stat-card stat-reject">
+        <div class="stat-number" id="statReject">0</div>
+        <div class="stat-label">Reddedilen</div>
+      </div>
+      
+      <div class="stat-card stat-add">
+        <div class="stat-number" id="statAdd">0</div>
+        <div class="stat-label">Eklenen</div>
+      </div>
+      
+      <div class="stat-card stat-total">
+        <div class="stat-number" id="statTotal">0</div>
+        <div class="stat-label">Toplam İşlem</div>
+      </div>
+    </div>
+
+    <!-- Aksiyon listesi -->
+    <div class="actions-container">
+      <h2>Son İşlemler</h2>
+      <div id="actionsList" class="actions-list">
+        <div class="loading">Yükleniyor...</div>
+      </div>
+    </div>
+
+    <!-- Harita görünümü -->
+    <div class="map-container">
+      <h2>Harita Görünümü</h2>
+      <div id="map" class="map"></div>
+    </div>
+  </div>
+
+  <script src="js/dashboard.js"></script>
+</body>
+</html>
