@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -17,27 +17,33 @@ export default function RouteSelectionScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [selectedRoute, setSelectedRoute] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isOffline, setIsOffline] = useState(false);
 
   useEffect(() => {
     loadRoutes();
   }, []);
 
   useEffect(() => {
-    if (searchQuery.trim() === '') {
-      setFilteredRoutes(routes);
-    } else {
-      const q = searchQuery.toLowerCase();
-      const filtered = routes.filter(r => 
-        r.route_number.toLowerCase().includes(q) ||
-        r.route_name.toLowerCase().includes(q)
-      );
-      setFilteredRoutes(filtered);
-    }
+    const timeoutId = setTimeout(() => {
+      if (searchQuery.trim() === '') {
+        setFilteredRoutes(routes);
+      } else {
+        const q = searchQuery.toLowerCase();
+        const filtered = routes.filter(r => 
+          r.route_number.toLowerCase().includes(q) ||
+          r.route_name.toLowerCase().includes(q)
+        );
+        setFilteredRoutes(filtered);
+      }
+    }, 300); // 300ms debounce
+
+    return () => clearTimeout(timeoutId);
   }, [searchQuery, routes]);
 
-  const loadRoutes = async () => {
+  const loadRoutes = useCallback(async () => {
     try {
       setLoading(true);
+      setIsOffline(false);
       const data = await getRoutes();
       setRoutes(data);
       setFilteredRoutes(data);
@@ -46,26 +52,48 @@ export default function RouteSelectionScreen({ navigation }) {
       const serverMsg = error?.response?.data?.error;
       const fallbackMsg = error?.message;
 
-      const message = serverMsg
-        ? `${serverMsg}${status ? ` (HTTP ${status})` : ''}`
-        : (status ? `Sunucu hatası (HTTP ${status}).` : null) ||
-          fallbackMsg ||
-          'Hatlar yüklenemedi.';
+      let message = 'Hatlar yüklenemedi.';
+      let isNetworkError = false;
+      
+      if (status === 404) {
+        message = 'Sunucu bulunamadı. Lütfen internet bağlantınızı kontrol edin.';
+        isNetworkError = true;
+      } else if (status >= 500) {
+        message = 'Sunucu hatası. Lütfen daha sonra tekrar deneyin.';
+      } else if (error.code === 'ECONNABORTED') {
+        message = 'Bağlantı zaman aşımına uğradı. Lütfen tekrar deneyin.';
+        isNetworkError = true;
+      } else if (error.code === 'ERR_NETWORK') {
+        message = 'İnternet bağlantınızı kontrol edin.';
+        isNetworkError = true;
+      } else if (serverMsg) {
+        message = `${serverMsg}${status ? ` (HTTP ${status})` : ''}`;
+      } else if (fallbackMsg) {
+        message = fallbackMsg;
+      }
 
-      Alert.alert('Hata', message);
+      setIsOffline(isNetworkError);
+
+      // Eğer cache'den veri gelmediyse hata göster
+      if (routes.length === 0) {
+        Alert.alert('Bağlantı Hatası', message, [
+          { text: 'Tekrar Dene', onPress: loadRoutes },
+          { text: 'Tamam', style: 'cancel' }
+        ]);
+      }
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const selectDirection = (route, direction) => {
+  const selectDirection = useCallback((route, direction) => {
     navigation.navigate('FieldMap', {
       routeId: route.id,
       routeNumber: route.route_number,
       routeName: route.route_name,
       direction: direction
     });
-  };
+  }, [navigation]);
 
   const renderRouteItem = ({ item }) => (
     <View style={styles.routeCard}>
@@ -124,6 +152,14 @@ export default function RouteSelectionScreen({ navigation }) {
         <Text style={styles.subtitle}>Hat ve yön seçin</Text>
       </View>
 
+      {isOffline && (
+        <View style={styles.offlineBanner}>
+          <Text style={styles.offlineBannerText}>
+            ⚠️ Çevrimdışı mod - Önbelleğe alınan veriler gösteriliyor
+          </Text>
+        </View>
+      )}
+
       <View style={styles.searchContainer}>
         <TextInput
           style={styles.searchInput}
@@ -149,6 +185,11 @@ export default function RouteSelectionScreen({ navigation }) {
         contentContainerStyle={styles.listContent}
         refreshing={loading}
         onRefresh={loadRoutes}
+        removeClippedSubviews={true}
+        maxToRenderPerBatch={10}
+        updateCellsBatchingPeriod={50}
+        initialNumToRender={10}
+        windowSize={5}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>
@@ -193,6 +234,19 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#FFFFFF',
     opacity: 0.9
+  },
+  offlineBanner: {
+    backgroundColor: '#FFA500',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#FF8C00'
+  },
+  offlineBannerText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center'
   },
   searchContainer: {
     paddingHorizontal: 16,

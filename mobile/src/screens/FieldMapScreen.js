@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -47,7 +47,6 @@ export default function FieldMapScreen({ route, navigation }) {
   const locationSubscription = useRef(null);
 
   useEffect(() => {
-    console.log('FieldMapScreen: useEffect başı');
     initializeMap();
     return () => {
       if (locationSubscription.current) {
@@ -58,7 +57,6 @@ export default function FieldMapScreen({ route, navigation }) {
 
   const initializeMap = async () => {
     try {
-      console.log('initializeMap: başlıyor', { routeId, direction });
       // Route verilerini önce yükle (konum izni olmasa da)
       const data = await getRouteWithDirection(routeId, direction);
       setRouteData(data.route);
@@ -71,11 +69,9 @@ export default function FieldMapScreen({ route, navigation }) {
       }
 
       setLoading(false);
-      console.log('initializeMap: route yükleme tamam');
 
       // Şimdi konum izni iste
       const { status } = await Location.requestForegroundPermissionsAsync();
-      console.log('initializeMap: konum izni sonucu', status);
       if (status !== 'granted') {
         setLocationError('Konum izni verilmedi. Harita görüntülenebilir ama konum takibi yapılamaz.');
         return;
@@ -91,21 +87,16 @@ export default function FieldMapScreen({ route, navigation }) {
           },
           handleLocationUpdate
         );
-        console.log('initializeMap: GPS tracking başlatıldı');
       } catch (locErr) {
-        console.log('initializeMap: Location.watchPositionAsync HATASI', locErr);
         setLocationError('Konum takibi başlatılamadı: ' + locErr.message);
       }
-
-      console.log('initializeMap: SONU');
     } catch (error) {
-      console.log('initializeMap: HATA', error);
       Alert.alert('Hata', error.message);
       setLoading(false);
     }
   };
 
-  const handleLocationUpdate = (location) => {
+  const handleLocationUpdate = useCallback((location) => {
     const { latitude, longitude } = location.coords;
     setUserLocation({ lat: latitude, lon: longitude });
 
@@ -140,7 +131,7 @@ export default function FieldMapScreen({ route, navigation }) {
         });
       }
     }
-  };
+  }, [skeleton, stops]);
 
   const handleApproveStop = async (stop) => {
     try {

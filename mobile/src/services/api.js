@@ -13,19 +13,39 @@ const API_BASE_URL = __DEV__
 
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 10000,
+  timeout: 15000, // 15 saniye timeout (Render.com için)
   headers: {
     'Content-Type': 'application/json'
   }
 });
 
 /**
+ * Retry mekanizması - başarısız istekleri tekrarlar
+ */
+const retryRequest = async (fn, retries = 3, delay = 1000) => {
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await fn();
+    } catch (error) {
+      if (i === retries - 1) throw error;
+      if (error.code === 'ECONNABORTED' || error.response?.status >= 500) {
+        await new Promise(resolve => setTimeout(resolve, delay * Math.pow(2, i)));
+      } else {
+        throw error;
+      }
+    }
+  }
+};
+
+/**
  * Tüm hatları getir
  */
 export const getRoutes = async () => {
   try {
-    const response = await api.get('/api/routes');
-    const routes = response.data?.routes || [];
+    const routes = await retryRequest(async () => {
+      const response = await api.get('/api/routes');
+      return response.data?.routes || [];
+    });
     
     // Başarılı ise cache'le
     if (routes.length > 0) {
@@ -34,7 +54,7 @@ export const getRoutes = async () => {
     
     return routes;
   } catch (error) {
-    console.error('Routes fetch error:', error);
+    if (__DEV__) console.error('Routes fetch error:', error);
     // Offline durumda cache'den getir
     const cached = await AsyncStorage.getItem('cached_routes');
     if (cached) {
@@ -49,8 +69,10 @@ export const getRoutes = async () => {
  */
 export const getRouteWithDirection = async (routeId, direction) => {
   try {
-    const response = await api.get(`/api/routes/${routeId}/direction/${direction}`);
-    const data = response.data;
+    const data = await retryRequest(async () => {
+      const response = await api.get(`/api/routes/${routeId}/direction/${direction}`);
+      return response.data;
+    });
     
     // Offline kullanım için cache'le
     await AsyncStorage.setItem(
@@ -60,7 +82,7 @@ export const getRouteWithDirection = async (routeId, direction) => {
     
     return data;
   } catch (error) {
-    console.error('Route data fetch error:', error);
+    if (__DEV__) console.error('Route data fetch error:', error);
     // Offline durumda cache'den getir
     const cached = await AsyncStorage.getItem(`route_${routeId}_${direction}`);
     if (cached) {
