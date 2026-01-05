@@ -47,6 +47,7 @@ export default function FieldMapScreen({ route, navigation }) {
   const locationSubscription = useRef(null);
 
   useEffect(() => {
+    console.log('FieldMapScreen: useEffect başı');
     initializeMap();
     return () => {
       if (locationSubscription.current) {
@@ -57,6 +58,7 @@ export default function FieldMapScreen({ route, navigation }) {
 
   const initializeMap = async () => {
     try {
+      console.log('initializeMap: başlıyor', { routeId, direction });
       // Route verilerini önce yükle (konum izni olmasa da)
       const data = await getRouteWithDirection(routeId, direction);
       setRouteData(data.route);
@@ -69,25 +71,35 @@ export default function FieldMapScreen({ route, navigation }) {
       }
 
       setLoading(false);
+      console.log('initializeMap: route yükleme tamam');
 
       // Şimdi konum izni iste
       const { status } = await Location.requestForegroundPermissionsAsync();
+      console.log('initializeMap: konum izni sonucu', status);
       if (status !== 'granted') {
         setLocationError('Konum izni verilmedi. Harita görüntülenebilir ama konum takibi yapılamaz.');
         return;
       }
 
       // GPS tracking başlat
-      locationSubscription.current = await Location.watchPositionAsync(
-        {
-          accuracy: Location.Accuracy.BestForNavigation,
-          timeInterval: 1000,
-          distanceInterval: 5
-        },
-        handleLocationUpdate
-      );
+      try {
+        locationSubscription.current = await Location.watchPositionAsync(
+          {
+            accuracy: Location.Accuracy.BestForNavigation,
+            timeInterval: 1000,
+            distanceInterval: 5
+          },
+          handleLocationUpdate
+        );
+        console.log('initializeMap: GPS tracking başlatıldı');
+      } catch (locErr) {
+        console.log('initializeMap: Location.watchPositionAsync HATASI', locErr);
+        setLocationError('Konum takibi başlatılamadı: ' + locErr.message);
+      }
 
+      console.log('initializeMap: SONU');
     } catch (error) {
+      console.log('initializeMap: HATA', error);
       Alert.alert('Hata', error.message);
       setLoading(false);
     }
