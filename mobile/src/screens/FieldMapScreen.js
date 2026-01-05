@@ -463,24 +463,28 @@ const styles = StyleSheet.create({
     top: 60,
     left: 16,
     right: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    borderRadius: 12,
-    padding: 16,
-    elevation: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.98)',
+    borderRadius: 16,
+    padding: 18,
+    elevation: 6,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)'
   },
   routeInfo: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333'
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#1E293B',
+    letterSpacing: 0.5
   },
   directionInfo: {
     fontSize: 16,
-    color: '#007AFF',
-    marginTop: 4
+    color: '#2563EB',
+    marginTop: 4,
+    fontWeight: '600'
   },
   errorBanner: {
     position: 'absolute',
@@ -503,10 +507,14 @@ const styles = StyleSheet.create({
     top: 160,
     left: 16,
     right: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    backgroundColor: 'rgba(255, 255, 255, 0.98)',
     borderRadius: 12,
-    padding: 12,
-    elevation: 4
+    padding: 14,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8
   },
   warningItem: {
     flexDirection: 'row',
@@ -528,19 +536,22 @@ const styles = StyleSheet.create({
     left: 16,
     right: 16,
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 20,
-    elevation: 8,
+    borderRadius: 20,
+    padding: 24,
+    elevation: 10,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    borderWidth: 1,
+    borderColor: '#F1F5F9'
   },
   stopName: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 8
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#1E293B',
+    marginBottom: 8,
+    letterSpacing: 0.3
   },
   stopInfo: {
     fontSize: 14,
@@ -554,20 +565,31 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     flex: 1,
-    paddingVertical: 14,
-    borderRadius: 8,
+    paddingVertical: 16,
+    borderRadius: 12,
     alignItems: 'center'
   },
   approveButton: {
-    backgroundColor: '#34C759'
+    backgroundColor: '#10B981',
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 4
   },
   rejectButton: {
-    backgroundColor: '#FF3B30'
+    backgroundColor: '#EF4444',
+    shadowColor: '#EF4444',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 4
   },
   buttonText: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: '#FFFFFF'
+    fontWeight: '700',
+    color: '#FFFFFF',
+    letterSpacing: 0.6
   },
   closeButton: {
     paddingVertical: 12,
@@ -582,16 +604,21 @@ const styles = StyleSheet.create({
     bottom: 32,
     left: 16,
     right: 16,
-    backgroundColor: '#007AFF',
-    paddingVertical: 16,
-    borderRadius: 12,
+    backgroundColor: '#2563EB',
+    paddingVertical: 18,
+    borderRadius: 16,
     alignItems: 'center',
-    elevation: 8
+    elevation: 10,
+    shadowColor: '#2563EB',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12
   },
   addButtonText: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#FFFFFF'
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: 0.8
   },
   modalOverlay: {
     flex: 1,
@@ -602,16 +629,22 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 24,
+    borderRadius: 20,
+    padding: 28,
     width: '100%',
-    maxWidth: 400
+    maxWidth: 400,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 12
   },
   modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 16
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#1E293B',
+    marginBottom: 16,
+    letterSpacing: 0.3
   },
   locationInfo: {
     backgroundColor: '#F5F5F5',
@@ -621,11 +654,13 @@ const styles = StyleSheet.create({
   },
   input: {
     borderWidth: 1,
-    borderColor: '#DDD',
-    borderRadius: 8,
-    padding: 12,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#F8F9FA',
+    borderRadius: 12,
+    padding: 14,
     fontSize: 16,
-    marginBottom: 16
+    marginBottom: 16,
+    color: '#1E293B'
   },
   modalButtons: {
     flexDirection: 'row',
@@ -641,7 +676,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#8E8E93'
   },
   confirmButton: {
-    backgroundColor: '#007AFF'
+    backgroundColor: '#2563EB',
+    shadowColor: '#2563EB',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3
   },
   modalButtonText: {
     fontSize: 16,
