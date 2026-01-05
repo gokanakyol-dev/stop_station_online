@@ -41,6 +41,11 @@ import('../public/pipeline/index.js')
     console.error('Pipeline import failed:', err);
   });
 
+// Health check endpoint (Render.com için)
+app.get('/healthz', (req, res) => {
+  res.status(200).json({ status: 'healthy', timestamp: new Date().toISOString() });
+});
+
 // Job status endpoint
 app.get('/status', (req, res) => {
   res.json({ status: lastJob.status, error: lastJob.error });
