@@ -41,14 +41,21 @@ import('../public/pipeline/index.js')
     console.error('Pipeline import failed:', err);
   });
 
-// Health check endpoint (Render.com için)
+// Health check endpoint (Render.com için - hem /healthz hem /status)
 app.get('/healthz', (req, res) => {
   res.status(200).json({ status: 'healthy', timestamp: new Date().toISOString() });
 });
 
-// Job status endpoint
+// Job status endpoint (aynı zamanda health check olarak kullanılıyor)
 app.get('/status', (req, res) => {
-  res.json({ status: lastJob.status, error: lastJob.error });
+  // Her zaman 200 OK dön (Render health check için)
+  res.status(200).json({ 
+    status: 'healthy',
+    service: 'stop-station',
+    timestamp: new Date().toISOString(),
+    jobStatus: lastJob.status,
+    jobError: lastJob.error 
+  });
 });
 
 // ANALYZE endpoint: GPS ve durak verisi alır, pipeline çalıştırır
