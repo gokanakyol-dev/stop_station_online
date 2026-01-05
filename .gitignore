@@ -1,0 +1,41 @@
+# Dependencies
+node_modules/
+mobile/node_modules/
+
+# Environment
+.env
+.env.local
+
+# Expo
+mobile/.expo/
+mobile/.expo-shared/
+mobile/dist/
+
+# Native
+mobile/ios/
+mobile/android/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Build
+build/
+dist/
+
+# Cache
+.cache/
+.parcel-cache/
