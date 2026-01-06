@@ -260,16 +260,27 @@ export default function FieldMapScreen({ route, navigation }) {
     
     // Projeksiyon hesapla
     if (skeleton) {
-      const projectionData = projectToRoute(skeleton, latitude, longitude);
-      
-      // Rotaya çok uzaksa uyar
-      if (projectionData.lateral_offset > 100) {
-        Alert.alert('Uyarı', `Seçilen nokta rotaya ${projectionData.lateral_offset.toFixed(0)}m uzakta. Daha yakın bir nokta seçin.`);
-        return;
+      try {
+        const projectionData = projectToRoute(skeleton, latitude, longitude);
+        
+        // Projeksiyon hesaplanamadıysa
+        if (!projectionData || projectionData.lateral_offset === null || projectionData.lateral_offset === undefined) {
+          Alert.alert('Hata', 'Bu nokta için projeksiyon hesaplanamadı. Rota çizgisine daha yakın bir nokta seçin.');
+          return;
+        }
+        
+        // Rotaya çok uzaksa uyar
+        if (projectionData.lateral_offset > 100) {
+          Alert.alert('Uyarı', `Seçilen nokta rotaya ${projectionData.lateral_offset.toFixed(0)}m uzakta. Daha yakın bir nokta seçin.`);
+          return;
+        }
+        
+        setSelectedLocation({ lat: latitude, lon: longitude });
+        setShowAddModal(true);
+      } catch (error) {
+        Alert.alert('Hata', 'Projeksiyon hesaplama hatası. Lütfen tekrar deneyin.');
+        if (__DEV__) console.error('Projeksiyon hatası:', error);
       }
-      
-      setSelectedLocation({ lat: latitude, lon: longitude });
-      setShowAddModal(true);
     } else {
       Alert.alert('Hata', 'Rota bilgisi yüklenmedi. Lütfen bekleyin.');
     }
