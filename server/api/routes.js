@@ -174,4 +174,92 @@ export const routeRoutes = (app) => {
       res.status(500).json({ error: err.message });
     }
   });
+
+  // Pipeline sonucunu kaydet (rota + otomatik tespit edilen duraklar)
+  app.post('/api/routes/:routeId/direction/:direction/save-pipeline', async (req, res) => {
+    try {
+      const { routeId, direction } = req.params;
+      const { polyline, skeleton, total_length, stops } = req.body;
+      
+      console.log(`Saving pipeline result for route ${routeId}, direction ${direction}`);
+      console.log(`Polyline: ${polyline?.length || 0} points, Skeleton: ${skeleton?.length || 0} points`);
+      console.log(`Stops: ${stops?.length || 0} stops to save`);
+      
+      // 1. Route'un directions bilgisini güncelle
+      const { data: routeData, error: routeError } = await supabase
+        .from('routes')
+        .select('directions')
+        .eq('id', routeId)
+        .single();
+      
+      if (routeError) throw routeError;
+      
+      const directions = routeData.directions || {
+        gidis: { polyline: [], skeleton: [], total_length: 0 },
+        donus: { polyline: [], skeleton: [], total_length: 0 }
+      };
+      
+      // Bu yönün verilerini güncelle
+      directions[direction] = {
+        polyline: polyline || [],
+        skeleton: skeleton || [],
+        total_length: total_length || 0
+      };
+      
+      const { error: updateError } = await supabase
+        .from('routes')
+        .update({ directions })
+        .eq('id', routeId);
+      
+      if (updateError) throw updateError;
+      console.log('Route directions updated');
+      
+      // 2. Bu yön için mevcut durakları sil
+      const { error: deleteError } = await supabase
+        .from('stops')
+        .delete()
+        .eq('route_id', routeId)
+        .eq('direction', direction);
+      
+      if (deleteError) throw deleteError;
+      console.log('Old stops deleted');
+      
+      // 3. Yeni durakları ekle
+      if (stops && stops.length > 0) {
+        const stopsToInsert = stops.map((stop, index) => ({
+          route_id: parseInt(routeId),
+          direction: direction,
+          name: stop.name || `Durak ${index + 1}`,
+          lat: stop.lat,
+          lon: stop.lon,
+          route_s: stop.distanceAlongRoute || 0,
+          sequence_number: stop.sequenceNumber || index + 1,
+          geom: `SRID=4326;POINT(${stop.lon} ${stop.lat})`
+        }));
+        
+        const { data: insertedStops, error: insertError } = await supabase
+          .from('stops')
+          .insert(stopsToInsert)
+          .select();
+        
+        if (insertError) throw insertError;
+        console.log(`${insertedStops.length} stops inserted`);
+        
+        res.json({ 
+          status: 'ok', 
+          message: `Rota ve ${insertedStops.length} durak kaydedildi`,
+          stopsCount: insertedStops.length 
+        });
+      } else {
+        res.json({ 
+          status: 'ok', 
+          message: 'Rota kaydedildi, durak bulunamadı',
+          stopsCount: 0 
+        });
+      }
+    } catch (err) {
+      console.error('Save pipeline error:', err);
+      res.status(500).json({ error: err.message });
+    }
+  });
 };

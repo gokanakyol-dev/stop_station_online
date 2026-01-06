@@ -46,9 +46,11 @@ let runStep1Pipeline = null;
 import('../public/pipeline/index.js')
   .then((mod) => {
     runStep1Pipeline = mod.runStep1Pipeline;
+    console.log('✅ Pipeline yüklendi');
   })
   .catch((err) => {
-    console.error('Pipeline import failed:', err);
+    console.error('❌ Pipeline import hatası:', err);
+    console.error('Stack:', err.stack);
   });
 
 // Health check endpoint (Render.com için - hem /healthz hem /status)
@@ -157,4 +159,18 @@ app.get('/', (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`✅ Stop Station API aktif: http://localhost:${PORT}`);
+}).on('error', (err) => {
+  console.error('❌ Sunucu hatası:', err);
+  process.exit(1);
+});
+
+// Yakalanmamış hataları logla
+process.on('uncaughtException', (err) => {
+  console.error('❌ Yakalanmamış hata:', err);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('❌ Yakalanmamış promise reddi:', reason);
+  process.exit(1);
 });

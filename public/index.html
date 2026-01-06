@@ -10,7 +10,10 @@
 <body>
   <div class="container">
     <header>
-      <h1>🚏 Stop Station</h1>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+        <h1>🚏 Stop Station</h1>
+        <a href="/dashboard.html" style="background: #10B981; color: white; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-weight: 500; font-size: 14px;">📊 Saha Kontrol Paneli</a>
+      </div>
       <p>GPS verisinden otobüs durağı tespiti</p>
     </header>
 
@@ -113,7 +116,26 @@
           <span class="btn-text">🔄 Pipeline Çalıştır</span>
           <span class="loader" style="display:none;">⏳ Yükleniyor...</span>
         </button>
+        <button id="btnSavePipeline" class="btn-success" disabled style="display:none;">
+          💾 Sonucu Kaydet
+        </button>
         <button id="btnClear" class="btn-secondary">🗑️ Temizle</button>
+      </div>
+
+      <!-- Hat ve Yön Seçimi (kaydetme için) -->
+      <div id="saveRoutePanel" class="form-group" style="display:none; margin-top: 16px; padding: 16px; background: #f0fdf4; border-radius: 8px; border: 2px solid #10B981;">
+        <h4 style="margin: 0 0 12px 0; color: #10B981;">💾 Pipeline Sonucunu Kaydet</h4>
+        <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+          <select id="saveRouteSelect" class="select-input" style="flex: 1; min-width: 200px;">
+            <option value="">Hat Seç...</option>
+          </select>
+          <select id="saveDirectionSelect" class="select-input" style="width: 120px;">
+            <option value="gidis">Gidiş</option>
+            <option value="donus">Dönüş</option>
+          </select>
+          <button id="btnConfirmSave" class="btn-success">💾 Kaydet</button>
+        </div>
+        <small style="display: block; margin-top: 8px; color: #6B7280;">Tespit edilen rota ve duraklar seçilen hatta kaydedilecek.</small>
       </div>
     </div>
 

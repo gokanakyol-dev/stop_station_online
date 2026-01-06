@@ -11,11 +11,17 @@ const comparisonCard = document.getElementById('comparisonCard');
 const comparisonResults = document.getElementById('comparisonResults');
 
 const btnDownloadStops = document.getElementById('btnDownloadStops');
+const btnSavePipeline = document.getElementById('btnSavePipeline');
+const saveRoutePanel = document.getElementById('saveRoutePanel');
+const saveRouteSelect = document.getElementById('saveRouteSelect');
+const saveDirectionSelect = document.getElementById('saveDirectionSelect');
+const btnConfirmSave = document.getElementById('btnConfirmSave');
 
 // State
 let gpsRecords = [];
 let stops = [];
 let pipelineResult = null;
+let allRoutes = []; // Tüm hatlar (kaydetme için)
 
 // Global API - Console'dan erişim için
 window.stopStation = {
@@ -594,29 +600,37 @@ btnPipeline.addEventListener('click', async () => {
     const coords = result.route.skeleton.map(p => [p.lat, p.lon]);
     L.polyline(coords, { color: '#2563eb', weight: 4, opacity: 0.9 }).addTo(layers.route);
     
-    // Tespit edilen durakları ekle (mavi yıldız)
+    // Otomatik tespit edilen durakları ekle (mavi yıldız) - autoStops veya stops
     layers.detectedStops.clearLayers();
-    if (result.stops && result.stops.detectedStops && result.stops.detectedStops.length > 0) {
-      for (const stop of result.stops.detectedStops) {
+    const autoDetected = result.autoStops?.detectedStops || result.stops?.detectedStops || [];
+    if (autoDetected.length > 0) {
+      for (const stop of autoDetected) {
         const marker = L.circleMarker([stop.lat, stop.lon], {
-          radius: 8,
-          color: '#3b82f6',
-          fillColor: '#60a5fa', // açık mavi
+          radius: 10,
+          color: '#10B981',
+          fillColor: '#34D399',
           fillOpacity: 0.95,
           weight: 3
         });
         
-        const popupText = `<b>⭐ TESPİT EDİLEN DURAK</b><br>` +
+        const popupText = `<b>🚏 OTOMATİK TESPİT EDİLEN DURAK</b><br>` +
           `<b>${stop.name || stop.id || 'Durak'}</b><br>` +
           `Sıra No: <b>#${stop.sequenceNumber}</b><br>` +
-          `Rotaya Uzaklık: ${stop.distanceToRoute.toFixed(0)}m<br>` +
-          `Rota Üzerinde: ${(stop.distanceAlongRoute / 1000).toFixed(2)}km`;
+          `Rotaya Uzaklık: ${stop.distanceToRoute?.toFixed(0) || 'N/A'}m<br>` +
+          `Rota Üzerinde: ${((stop.distanceAlongRoute || 0) / 1000).toFixed(2)}km<br>` +
+          `Nokta Sayısı: ${stop.pointCount || 'N/A'}<br>` +
+          `Durma Süresi: ${stop.duration?.toFixed(0) || 'N/A'}s`;
         
         marker.bindPopup(popupText);
         marker.addTo(layers.detectedStops);
       }
       
-      console.log(`${result.stops.detectedStops.length} tespit edilen durak haritaya eklendi (mavi layer)`);
+      console.log(`✅ ${autoDetected.length} OTOMATİK TESPİT EDİLEN DURAK haritaya eklendi (yeşil marker)`);
+      
+      // Kaydetme panelini göster
+      showSavePanel();
+    } else {
+      console.log('⚠️ Otomatik durak tespit edilemedi. GPS verisinde düşük hızlı noktalar bulunamadı.');
     }
     
     if (coords.length > 0) {
@@ -628,9 +642,9 @@ btnPipeline.addEventListener('click', async () => {
       pipeline: result.pipeline,
       skeletonPoints: result.route.skeleton.length,
       totalDistanceKm: result.pipeline.step1E.totalDistanceKm,
-      stopDetection: result.stops ? {
-        detected: result.stops.detectedStops.length,
-        filtered: result.stops.filteredStops.length
+      autoStopDetection: result.autoStops ? {
+        detected: result.autoStops.detectedStops.length,
+        clusters: result.autoStops.clusters?.length || 0
       } : null,
       stopComparison: result.comparison ? result.comparison.stats : null,
       logs: result.log.map(l => l.message)
@@ -717,7 +731,6 @@ if (btnDownloadStops) {
 // ==========================================
 
 const API_BASE = '';  // Aynı origin
-let allRoutes = [];
 let allStops = [];
 
 // Tab sistemi
@@ -737,20 +750,31 @@ async function loadRoutes() {
   
   try {
     routesList.innerHTML = '<p class="loading-text">Yükleniyor...</p>';
+    console.log('Hatlar yükleniyor:', `${API_BASE}/api/routes`);
     const res = await fetch(`${API_BASE}/api/routes`);
+    console.log('Response status:', res.status, res.statusText);
+    
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+    }
+    
     const data = await res.json();
+    console.log('Hatlar yüklendi:', data);
     allRoutes = data.routes || [];
+    console.log('allRoutes set:', allRoutes.length, 'hat');
     
     // Select'leri güncelle
     updateRouteSelects();
     renderRoutes(allRoutes);
   } catch (err) {
+    console.error('Hatlar yüklenirken hata:', err);
     routesList.innerHTML = `<p class="no-data">Hatalar yüklenemedi: ${err.message}</p>`;
   }
 }
 
 function renderRoutes(routes) {
   const routesList = document.getElementById('routesList');
+  console.log('renderRoutes çağrıldı, routes:', routes.length);
   
   if (routes.length === 0) {
     routesList.innerHTML = '<p class="no-data">Hat bulunamadı</p>';
@@ -769,6 +793,7 @@ function renderRoutes(routes) {
       </div>
     </div>
   `).join('');
+  console.log('Hatlar DOM\'a eklendi');
 }
 
 function updateRouteSelects() {
@@ -977,6 +1002,105 @@ document.getElementById('btnRefreshRoutes')?.addEventListener('click', () => {
   loadRoutes();
   loadStops();
 });
+
+// =============================================
+// PIPELINE SONUCU KAYDETME FONKSİYONLARI
+// =============================================
+
+// Hatları yükle (kaydetme dropdown için)
+async function loadRoutesForSave() {
+  try {
+    const res = await fetch(`${API_BASE}/api/routes`);
+    const data = await res.json();
+    allRoutes = data.routes || [];
+    
+    // Dropdown'ı doldur
+    if (saveRouteSelect) {
+      saveRouteSelect.innerHTML = '<option value="">Hat Seç...</option>';
+      allRoutes.forEach(route => {
+        const option = document.createElement('option');
+        option.value = route.id;
+        option.textContent = `${route.route_number} - ${route.route_name}`;
+        saveRouteSelect.appendChild(option);
+      });
+    }
+  } catch (err) {
+    console.error('Hatlar yüklenemedi:', err);
+  }
+}
+
+// Kaydetme panelini göster
+function showSavePanel() {
+  if (saveRoutePanel) {
+    saveRoutePanel.style.display = 'block';
+    loadRoutesForSave();
+  }
+}
+
+// Pipeline sonucunu kaydet
+async function savePipelineResult() {
+  const routeId = saveRouteSelect?.value;
+  const direction = saveDirectionSelect?.value || 'gidis';
+  
+  if (!routeId) {
+    alert('Lütfen bir hat seçin');
+    return;
+  }
+  
+  if (!pipelineResult) {
+    alert('Önce pipeline çalıştırın');
+    return;
+  }
+  
+  const autoDetected = pipelineResult.autoStops?.detectedStops || [];
+  const skeleton = pipelineResult.route?.skeleton || [];
+  const totalLength = pipelineResult.pipeline?.step1E?.totalDistanceKm * 1000 || 0;
+  
+  // Skeleton'dan polyline oluştur
+  const polyline = skeleton.map(p => [p.lat, p.lon]);
+  
+  try {
+    btnConfirmSave.disabled = true;
+    btnConfirmSave.textContent = '⏳ Kaydediliyor...';
+    
+    const res = await fetch(`${API_BASE}/api/routes/${routeId}/direction/${direction}/save-pipeline`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        polyline: polyline,
+        skeleton: skeleton,
+        total_length: totalLength,
+        stops: autoDetected
+      })
+    });
+    
+    const data = await res.json();
+    
+    if (!res.ok) {
+      throw new Error(data.error || 'Kaydetme hatası');
+    }
+    
+    alert(`✅ ${data.message}`);
+    log(`✅ Pipeline sonucu kaydedildi: ${data.stopsCount} durak`);
+    
+    // Paneli gizle
+    saveRoutePanel.style.display = 'none';
+    
+    // Hatları yenile
+    loadRoutes();
+    loadStops();
+    
+  } catch (err) {
+    alert('❌ Hata: ' + err.message);
+    console.error('Save error:', err);
+  } finally {
+    btnConfirmSave.disabled = false;
+    btnConfirmSave.textContent = '💾 Kaydet';
+  }
+}
+
+// Kaydet butonu event listener
+btnConfirmSave?.addEventListener('click', savePipelineResult);
 
 // Sayfa yüklenince verileri çek
 loadRoutes();
