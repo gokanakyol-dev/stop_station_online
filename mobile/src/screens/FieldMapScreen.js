@@ -263,18 +263,45 @@ export default function FieldMapScreen({ route, navigation }) {
       try {
         const projectionData = projectToRoute(skeleton, latitude, longitude);
         
-        // Projeksiyon hesaplanamadıysa
+        // Projeksiyon hesaplanamadıysa bile devam et
         if (!projectionData || projectionData.lateral_offset === null || projectionData.lateral_offset === undefined) {
-          Alert.alert('Hata', 'Bu nokta için projeksiyon hesaplanamadı. Rota çizgisine daha yakın bir nokta seçin.');
+          Alert.alert(
+            'Projeksiyon Hesaplanamadı',
+            'Bu nokta rota dışında. Yine de durak olarak eklemek ister misiniz?',
+            [
+              { text: 'İptal', style: 'cancel' },
+              { 
+                text: 'Ekle', 
+                onPress: () => {
+                  setSelectedLocation({ lat: latitude, lon: longitude });
+                  setShowAddModal(true);
+                }
+              }
+            ]
+          );
           return;
         }
         
-        // Rotaya çok uzaksa uyar
-        if (projectionData.lateral_offset > 100) {
-          Alert.alert('Uyarı', `Seçilen nokta rotaya ${projectionData.lateral_offset.toFixed(0)}m uzakta. Daha yakın bir nokta seçin.`);
+        // Rotaya 500m'den uzaksa onay iste
+        if (projectionData.lateral_offset > 500) {
+          Alert.alert(
+            'Projeksiyon Alanı Dışında',
+            `Seçilen nokta rotaya ${projectionData.lateral_offset.toFixed(0)}m uzakta. Yine de eklemek istiyor musunuz?`,
+            [
+              { text: 'İptal', style: 'cancel' },
+              { 
+                text: 'Ekle', 
+                onPress: () => {
+                  setSelectedLocation({ lat: latitude, lon: longitude });
+                  setShowAddModal(true);
+                }
+              }
+            ]
+          );
           return;
         }
         
+        // 500m içindeyse direkt ekle
         setSelectedLocation({ lat: latitude, lon: longitude });
         setShowAddModal(true);
       } catch (error) {
@@ -356,13 +383,24 @@ export default function FieldMapScreen({ route, navigation }) {
       >
         {/* Route çizgisi */}
         {getPolylineCoords().length > 0 && (
-          <Polyline
-            coordinates={getPolylineCoords()}
-            strokeColor="#10B981"
-            strokeWidth={5}
-            lineCap="round"
-            lineJoin="round"
-          />
+          <>
+            {/* Projeksiyon koridoru - 100m buffer zone (gölgeli alan) */}
+            <Polyline
+              coordinates={getPolylineCoords()}
+              strokeColor="rgba(16, 185, 129, 0.15)"
+              strokeWidth={220}
+              lineCap="round"
+              lineJoin="round"
+            />
+            {/* Ana rota çizgisi */}
+            <Polyline
+              coordinates={getPolylineCoords()}
+              strokeColor="#10B981"
+              strokeWidth={6}
+              lineCap="round"
+              lineJoin="round"
+            />
+          </>
         )}
 
         {/* Duraklar */}
@@ -394,14 +432,26 @@ export default function FieldMapScreen({ route, navigation }) {
 
         {/* Kullanıcı konumu - Büyük mavi marker */}
         {userLocation && (
-          <Marker
-            coordinate={{ latitude: userLocation.lat, longitude: userLocation.lon }}
-            title="Konumunuz"
-          >
-            <View style={styles.userLocationMarker}>
-              <View style={styles.userLocationInner} />
-            </View>
-          </Marker>
+          <>
+            {/* Accuracy circle */}
+            <Circle
+              center={{ latitude: userLocation.lat, longitude: userLocation.lon }}
+              radius={20}
+              fillColor="rgba(59, 130, 246, 0.1)"
+              strokeColor="rgba(59, 130, 246, 0.3)"
+              strokeWidth={2}
+            />
+            {/* Location marker */}
+            <Marker
+              coordinate={{ latitude: userLocation.lat, longitude: userLocation.lon }}
+              title="Konumunuz"
+              anchor={{ x: 0.5, y: 0.5 }}
+            >
+              <View style={styles.userLocationMarker}>
+                <View style={styles.userLocationInner} />
+              </View>
+            </Marker>
+          </>
         )}
 
         {/* Seçilen konum - Yeni durak eklenecek yer */}
@@ -692,20 +742,24 @@ const styles = StyleSheet.create({
     marginHorizontal: 12
   },
   userLocationMarker: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: 'rgba(16, 185, 129, 0.3)',
-    borderWidth: 3,
-    borderColor: '#10B981',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(59, 130, 246, 0.2)',
+    borderWidth: 4,
+    borderColor: '#3B82F6',
     justifyContent: 'center',
-    alignItems: 'center'
+    alignItems: 'center',
+    shadowColor: '#3B82F6',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 10
   },
   userLocationInner: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: '#10B981'
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#3B82F6'
   },
   errorBanner: {
     position: 'absolute',
