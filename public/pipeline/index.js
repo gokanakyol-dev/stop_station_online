@@ -4,7 +4,7 @@ import { cleanGPS } from './cleanGPS.js';
 import { segmentTrips } from './segmentation.js';
 import { computeSegmentHeadings, clusterByDirection } from './directionFilter.js';
 import { filterByRouteConsistency } from './routeFilter.js';
-import { buildRoute, snapToRoad, simplifyRoute, computeRouteSkeleton, processDetectedStops, compareRealStopsWithGroupedStops } from './routeConstruction.js';
+import { buildRoute, snapToRoad, simplifyRoute, computeRouteSkeleton, processDetectedStops, compareRealStopsWithGroupedStops, detectStopsFromGPS } from './routeConstruction.js';
 import { haversineDistance } from './utils.js';
 
 function chunkEvenly(items, max) {
@@ -106,21 +106,36 @@ export async function runStep1Pipeline(gpsRecords, options = {}) {
   const totalDistance = routeSkeleton[routeSkeleton.length - 1]?.distance ?? 0;
   step(`1E.4: ${routeSkeleton.length} nokta, ${(totalDistance / 1000).toFixed(2)} km`);
 
-  // GPS verilerinden durakları tespit et - HER ZAMAN çalışsın
+  // GPS verilerinden otomatik durak tespiti
   let stopDetection = null;
   let stopComparison = null;
+  let autoDetectedStops = null;
   
-  step('1F - Durak Tespiti (GPS Durma Noktaları)...');
-  step(`1F.1: GPS yönü: ${selected.meanHeading.toFixed(0)}°, ${stops.length} gerçek durak referansı`);
+  step('1F - GPS Durma Noktalarından Otomatik Durak Tespiti...');
   
-  stopDetection = processDetectedStops(stops, routeSkeleton);
-  step(`1F.2: ${stopDetection.detectedStops.length} durak tespit edildi, ${stopDetection.filteredStops.length} filtrelendi`);
+  // Tüm GPS noktalarını topla (dominant segmentlerden)
+  const allGpsPoints = dominant.flatMap(seg => seg.points);
+  step(`1F.1: ${allGpsPoints.length} GPS noktası analiz edilecek`);
   
-  // Gerçek duraklar ile tespit edilen durakları karşılaştır (sadece varsa)
-  if (stops && stops.length > 0 && stopDetection.detectedStops.length > 0) {
+  // GPS'ten otomatik durak tespiti yap
+  autoDetectedStops = detectStopsFromGPS(allGpsPoints, routeSkeleton, {
+    maxSpeed: 5,          // 5 km/h altı = durma
+    minStopDuration: 8,   // 8 saniye minimum durma
+    clusterRadius: 50,    // 50m içindeki noktalar aynı durak
+    minPointsInCluster: 2 // minimum 2 nokta
+  });
+  step(`1F.2: ${autoDetectedStops.detectedStops.length} durak otomatik tespit edildi`);
+  
+  // Eğer gerçek duraklar da verilmişse karşılaştır
+  if (stops && stops.length > 0) {
     step('1G - Gerçek Duraklar ile Karşılaştırma...');
-    stopComparison = compareRealStopsWithGroupedStops(stops, stopDetection.detectedStops);
-    step(`1G: ${stopComparison.stats.matchedCount} eşleşme bulundu (${stopComparison.stats.matchRate})`);
+    stopDetection = processDetectedStops(stops, routeSkeleton);
+    step(`1G.1: ${stopDetection.detectedStops.length} gerçek durak rotaya project edildi`);
+    
+    if (autoDetectedStops.detectedStops.length > 0 && stopDetection.detectedStops.length > 0) {
+      stopComparison = compareRealStopsWithGroupedStops(stopDetection.detectedStops, autoDetectedStops.detectedStops);
+      step(`1G.2: ${stopComparison.stats.matchedCount} eşleşme bulundu (${stopComparison.stats.matchRate})`);
+    }
   }
 
   return {
@@ -131,11 +146,12 @@ export async function runStep1Pipeline(gpsRecords, options = {}) {
       step1C: { clusterCount: clusters.length, selectedDirection: selected.meanHeading, dominantRatio },
       step1D: { dominantCount: dominant.length, rejectedCount: rejectedRoute.length, clusterCount },
       step1E: { totalPoints: stats.totalPoints, deduplicatedPoints: stats.deduplicatedPoints, snappedPoints: snappedPoints.length, skeletonPoints: routeSkeleton.length, totalDistanceKm: totalDistance / 1000, matchInfo },
-      step1F: stopDetection ? { detectedStopsCount: stopDetection.detectedStops.length, filteredStopsCount: stopDetection.filteredStops.length } : null,
+      step1F: { autoDetectedCount: autoDetectedStops?.detectedStops?.length || 0, clusterCount: autoDetectedStops?.clusters?.length || 0 },
       step1G: stopComparison ? stopComparison.stats : null
     },
     route: { raw: routePoints, snapped: snappedPoints, skeleton: routeSkeleton },
     stops: stopDetection,
+    autoStops: autoDetectedStops,
     comparison: stopComparison
   };
 }

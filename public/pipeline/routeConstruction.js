@@ -371,3 +371,150 @@ export function compareRealStopsWithGroupedStops(realStops, groupedStops) {
   
   return { stats, matches, unmatchedRealStops, unmatchedGroupedStops };
 }
+
+// GPS verilerinden otomatik durak tespiti - düşük hızlı noktaları cluster'la
+export function detectStopsFromGPS(gpsPoints, skeleton, options = {}) {
+  const {
+    maxSpeed = 5,           // km/h - durma hızı eşiği
+    minStopDuration = 10,   // saniye - minimum durma süresi
+    clusterRadius = 50,     // metre - aynı durak sayılma mesafesi
+    minPointsInCluster = 3  // minimum nokta sayısı
+  } = options;
+
+  console.log(`detectStopsFromGPS: ${gpsPoints.length} GPS noktası analiz ediliyor...`);
+  console.log(`Parametreler: maxSpeed=${maxSpeed}km/h, minDuration=${minStopDuration}s, clusterRadius=${clusterRadius}m`);
+  
+  // 1. Düşük hızlı noktaları bul
+  const slowPoints = gpsPoints.filter(p => {
+    const speed = p.speed || p.hiz || 0;
+    return speed <= maxSpeed;
+  });
+  
+  console.log(`${slowPoints.length} düşük hızlı nokta bulundu (hız <= ${maxSpeed} km/h)`);
+  
+  if (slowPoints.length === 0) {
+    console.log('Düşük hızlı nokta bulunamadı, durak tespiti yapılamıyor');
+    return { detectedStops: [], clusters: [] };
+  }
+  
+  // 2. Düşük hızlı noktaları cluster'la (basit DBSCAN benzeri)
+  const clusters = [];
+  const visited = new Set();
+  
+  for (let i = 0; i < slowPoints.length; i++) {
+    if (visited.has(i)) continue;
+    
+    const cluster = [slowPoints[i]];
+    visited.add(i);
+    
+    // Bu noktaya yakın diğer düşük hızlı noktaları bul
+    for (let j = i + 1; j < slowPoints.length; j++) {
+      if (visited.has(j)) continue;
+      
+      const dist = haversineDistance(
+        slowPoints[i].lat, slowPoints[i].lon,
+        slowPoints[j].lat, slowPoints[j].lon
+      );
+      
+      if (dist <= clusterRadius) {
+        cluster.push(slowPoints[j]);
+        visited.add(j);
+      }
+    }
+    
+    if (cluster.length >= minPointsInCluster) {
+      clusters.push(cluster);
+    }
+  }
+  
+  console.log(`${clusters.length} potansiyel durak cluster'ı bulundu`);
+  
+  // 3. Her cluster için durak noktası oluştur
+  const detectedStops = [];
+  
+  for (let i = 0; i < clusters.length; i++) {
+    const cluster = clusters[i];
+    
+    // Cluster merkezi hesapla (ortalama koordinat)
+    const avgLat = cluster.reduce((sum, p) => sum + p.lat, 0) / cluster.length;
+    const avgLon = cluster.reduce((sum, p) => sum + p.lon, 0) / cluster.length;
+    
+    // Zaman aralığını hesapla
+    const timestamps = cluster.map(p => new Date(p.timestamp || p.konumZamani).getTime()).filter(t => !isNaN(t));
+    const duration = timestamps.length > 1 ? (Math.max(...timestamps) - Math.min(...timestamps)) / 1000 : 0;
+    
+    // Minimum süre kontrolü
+    if (duration < minStopDuration && cluster.length < 5) {
+      console.log(`Cluster ${i+1} atlandı: süre yetersiz (${duration.toFixed(0)}s)`);
+      continue;
+    }
+    
+    // Skeleton'a project et
+    let minDistToRoute = Infinity;
+    let closestSkeletonIndex = -1;
+    let projectedDistance = 0;
+    
+    for (let j = 0; j < skeleton.length; j++) {
+      const dist = haversineDistance(avgLat, avgLon, skeleton[j].lat, skeleton[j].lon);
+      if (dist < minDistToRoute) {
+        minDistToRoute = dist;
+        closestSkeletonIndex = j;
+        projectedDistance = skeleton[j].distance;
+      }
+    }
+    
+    // Rotaya çok uzaksa atla
+    if (minDistToRoute > 300) {
+      console.log(`Cluster ${i+1} atlandı: rotaya çok uzak (${minDistToRoute.toFixed(0)}m)`);
+      continue;
+    }
+    
+    detectedStops.push({
+      id: `auto_stop_${i+1}`,
+      name: `Durak ${i+1}`,
+      lat: avgLat,
+      lon: avgLon,
+      distanceAlongRoute: projectedDistance,
+      distanceToRoute: minDistToRoute,
+      pointCount: cluster.length,
+      duration: duration,
+      autoDetected: true
+    });
+  }
+  
+  // Rota mesafesine göre sırala
+  detectedStops.sort((a, b) => a.distanceAlongRoute - b.distanceAlongRoute);
+  
+  // Çok yakın durakları birleştir (100m içinde)
+  const mergedStops = [];
+  for (const stop of detectedStops) {
+    const lastStop = mergedStops[mergedStops.length - 1];
+    if (lastStop && Math.abs(stop.distanceAlongRoute - lastStop.distanceAlongRoute) < 100) {
+      // Birleştir - daha fazla nokta olanı tut
+      if (stop.pointCount > lastStop.pointCount) {
+        mergedStops[mergedStops.length - 1] = stop;
+      }
+    } else {
+      mergedStops.push(stop);
+    }
+  }
+  
+  // Sıra numarası ver
+  for (let i = 0; i < mergedStops.length; i++) {
+    mergedStops[i].sequenceNumber = i + 1;
+    mergedStops[i].name = `Durak ${i + 1}`;
+  }
+  
+  console.log(`detectStopsFromGPS: ${mergedStops.length} durak tespit edildi`);
+  console.table(mergedStops.map(s => ({
+    'Sıra': s.sequenceNumber,
+    'Lat': s.lat.toFixed(6),
+    'Lon': s.lon.toFixed(6),
+    'Rotaya Uzaklık': `${s.distanceToRoute.toFixed(0)}m`,
+    'Rota Mesafesi': `${(s.distanceAlongRoute / 1000).toFixed(2)}km`,
+    'Nokta Sayısı': s.pointCount,
+    'Süre': `${s.duration.toFixed(0)}s`
+  })));
+  
+  return { detectedStops: mergedStops, clusters };
+}
