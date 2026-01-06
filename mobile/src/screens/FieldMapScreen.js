@@ -25,6 +25,63 @@ import {
   getPointAtRouteS
 } from '../utils/routeProjection';
 
+// Dark theme harita stili
+const darkMapStyle = [
+  { elementType: "geometry", stylers: [{ color: "#1F2937" }] },
+  { elementType: "labels.text.stroke", stylers: [{ color: "#111827" }] },
+  { elementType: "labels.text.fill", stylers: [{ color: "#9CA3AF" }] },
+  {
+    featureType: "administrative.locality",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#D1D5DB" }]
+  },
+  {
+    featureType: "poi",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#9CA3AF" }]
+  },
+  {
+    featureType: "poi.park",
+    elementType: "geometry",
+    stylers: [{ color: "#374151" }]
+  },
+  {
+    featureType: "poi.park",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#6B7280" }]
+  },
+  {
+    featureType: "road",
+    elementType: "geometry",
+    stylers: [{ color: "#374151" }]
+  },
+  {
+    featureType: "road",
+    elementType: "geometry.stroke",
+    stylers: [{ color: "#1F2937" }]
+  },
+  {
+    featureType: "road.highway",
+    elementType: "geometry",
+    stylers: [{ color: "#4B5563" }]
+  },
+  {
+    featureType: "road.highway",
+    elementType: "geometry.stroke",
+    stylers: [{ color: "#1F2937" }]
+  },
+  {
+    featureType: "water",
+    elementType: "geometry",
+    stylers: [{ color: "#111827" }]
+  },
+  {
+    featureType: "water",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#4B5563" }]
+  }
+];
+
 export default function FieldMapScreen({ route, navigation }) {
   const { routeId, routeNumber, routeName, direction } = route.params;
   
@@ -313,13 +370,16 @@ export default function FieldMapScreen({ route, navigation }) {
         showsMyLocationButton={true}
         followsUserLocation={false}
         onPress={handleMapPress}
+        customMapStyle={darkMapStyle}
       >
         {/* Route çizgisi */}
         {getPolylineCoords().length > 0 && (
           <Polyline
             coordinates={getPolylineCoords()}
-            strokeColor="#007AFF"
-            strokeWidth={4}
+            strokeColor="#10B981"
+            strokeWidth={5}
+            lineCap="round"
+            lineJoin="round"
           />
         )}
 
@@ -381,19 +441,46 @@ export default function FieldMapScreen({ route, navigation }) {
 
       {/* Üst bilgi paneli */}
       <View style={styles.topPanel}>
-        <Text style={styles.routeInfo}>
-          {routeNumber} - {routeName}
-        </Text>
-        <Text style={styles.directionInfo}>
-          {direction === 'gidis' ? '→ GİDİŞ' : '← DÖNÜŞ'}
-        </Text>
+        <View style={styles.headerRow}>
+          <TouchableOpacity 
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Text style={styles.backButtonText}>←</Text>
+          </TouchableOpacity>
+          <View style={styles.headerInfo}>
+            <Text style={styles.routeInfo}>
+              {routeNumber}
+            </Text>
+            <Text style={styles.routeName}>
+              {routeName}
+            </Text>
+          </View>
+          <View style={styles.directionBadge}>
+            <Text style={styles.directionBadgeText}>
+              {direction === 'gidis' ? '→' : '←'}
+            </Text>
+          </View>
+        </View>
         
         {/* Proximity indicator */}
         {projection && userLocation && (
-          <View style={styles.proximityIndicator}>
-            <Text style={styles.proximityText}>
-              📍 Rotada: {projection.route_s.toFixed(0)}m | Mesafe: {projection.lateral_offset.toFixed(0)}m
-            </Text>
+          <View style={styles.proximityCard}>
+            <View style={styles.proximityItem}>
+              <Text style={styles.proximityIcon}>📍</Text>
+              <View>
+                <Text style={styles.proximityLabel}>Rotada</Text>
+                <Text style={styles.proximityValue}>{projection.route_s.toFixed(0)}m</Text>
+              </View>
+            </View>
+            <View style={styles.proximityDivider} />
+            <View style={styles.proximityItem}>
+              <Text style={styles.proximityIcon}>🎯</Text>
+              <View>
+                <Text style={styles.proximityLabel}>Mesafe</Text>
+                <Text style={styles.proximityValue}>{projection.lateral_offset.toFixed(0)}m</Text>
+              </View>
+            </View>
           </View>
         )}
       </View>
@@ -527,7 +614,8 @@ export default function FieldMapScreen({ route, navigation }) {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1
+    flex: 1,
+    backgroundColor: '#111827'
   },
   centered: {
     flex: 1,
@@ -544,15 +632,15 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 20,
     right: 16,
-    backgroundColor: '#2563EB',
+    backgroundColor: '#10B981',
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 20,
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
+    elevation: 6,
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
     zIndex: 100
   },
   mapToggleText: {
@@ -562,50 +650,110 @@ const styles = StyleSheet.create({
   },
   topPanel: {
     position: 'absolute',
-    top: 60,
+    top: 50,
     left: 16,
     right: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.98)',
-    borderRadius: 16,
-    padding: 18,
-    elevation: 6,
+    backgroundColor: 'rgba(17, 24, 39, 0.95)',
+    borderRadius: 20,
+    padding: 16,
+    elevation: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
+    shadowOpacity: 0.3,
     shadowRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)'
+    borderColor: 'rgba(75, 85, 99, 0.3)'
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(16, 185, 129, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12
+  },
+  backButtonText: {
+    fontSize: 20,
+    color: '#10B981',
+    fontWeight: '700'
+  },
+  headerInfo: {
+    flex: 1
   },
   routeInfo: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: '800',
-    color: '#1E293B',
+    color: '#FFFFFF',
     letterSpacing: 0.5
   },
-  directionInfo: {
-    fontSize: 16,
-    color: '#2563EB',
-    marginTop: 4,
-    fontWeight: '600'
+  routeName: {
+    fontSize: 14,
+    color: '#9CA3AF',
+    marginTop: 2,
+    fontWeight: '500'
   },
-  proximityIndicator: {
-    marginTop: 10,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: '#E2E8F0'
+  directionBadge: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#10B981',
+    justifyContent: 'center',
+    alignItems: 'center'
   },
-  proximityText: {
-    fontSize: 13,
-    color: '#64748B',
-    fontWeight: '600'
+  directionBadgeText: {
+    fontSize: 18,
+    color: '#FFFFFF',
+    fontWeight: '700'
+  },
+  proximityCard: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(31, 41, 55, 0.9)',
+    borderRadius: 16,
+    padding: 14,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.3)'
+  },
+  proximityItem: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10
+  },
+  proximityIcon: {
+    fontSize: 20
+  },
+  proximityLabel: {
+    fontSize: 11,
+    color: '#9CA3AF',
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5
+  },
+  proximityValue: {
+    fontSize: 18,
+    color: '#10B981',
+    fontWeight: '800',
+    marginTop: 2
+  },
+  proximityDivider: {
+    width: 1,
+    backgroundColor: 'rgba(75, 85, 99, 0.5)',
+    marginHorizontal: 12
   },
   userLocationMarker: {
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: 'rgba(37, 99, 235, 0.3)',
+    backgroundColor: 'rgba(16, 185, 129, 0.3)',
     borderWidth: 3,
-    borderColor: '#2563EB',
+    borderColor: '#10B981',
     justifyContent: 'center',
     alignItems: 'center'
   },
@@ -613,7 +761,7 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: '#2563EB'
+    backgroundColor: '#10B981'
   },
   errorBanner: {
     position: 'absolute',
@@ -633,17 +781,19 @@ const styles = StyleSheet.create({
   },
   warningPanel: {
     position: 'absolute',
-    top: 160,
+    top: 200,
     left: 16,
     right: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.98)',
-    borderRadius: 12,
+    backgroundColor: 'rgba(17, 24, 39, 0.95)',
+    borderRadius: 16,
     padding: 14,
-    elevation: 5,
+    elevation: 6,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(75, 85, 99, 0.3)'
   },
   warningItem: {
     flexDirection: 'row',
@@ -657,34 +807,34 @@ const styles = StyleSheet.create({
   warningText: {
     flex: 1,
     fontSize: 14,
-    color: '#333'
+    color: '#D1D5DB'
   },
   stopPanel: {
     position: 'absolute',
     bottom: 100,
     left: 16,
     right: 16,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
+    backgroundColor: 'rgba(17, 24, 39, 0.98)',
+    borderRadius: 24,
     padding: 24,
-    elevation: 10,
+    elevation: 12,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.25,
-    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 20,
     borderWidth: 1,
-    borderColor: '#F1F5F9'
+    borderColor: 'rgba(16, 185, 129, 0.3)'
   },
   stopName: {
     fontSize: 22,
     fontWeight: '800',
-    color: '#1E293B',
+    color: '#FFFFFF',
     marginBottom: 8,
     letterSpacing: 0.3
   },
   stopInfo: {
     fontSize: 14,
-    color: '#666',
+    color: '#9CA3AF',
     marginBottom: 16
   },
   buttonRow: {
@@ -733,14 +883,14 @@ const styles = StyleSheet.create({
     bottom: 32,
     left: 16,
     right: 16,
-    backgroundColor: '#2563EB',
+    backgroundColor: '#10B981',
     paddingVertical: 18,
     borderRadius: 16,
     alignItems: 'center',
     elevation: 10,
-    shadowColor: '#2563EB',
+    shadowColor: '#10B981',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
+    shadowOpacity: 0.5,
     shadowRadius: 12
   },
   addButtonText: {
@@ -757,39 +907,43 @@ const styles = StyleSheet.create({
     padding: 20
   },
   modalContent: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
+    backgroundColor: 'rgba(17, 24, 39, 0.98)',
+    borderRadius: 24,
     padding: 28,
     width: '100%',
     maxWidth: 400,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.4,
     shadowRadius: 20,
-    elevation: 12
+    elevation: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(75, 85, 99, 0.5)'
   },
   modalTitle: {
     fontSize: 22,
     fontWeight: '800',
-    color: '#1E293B',
+    color: '#FFFFFF',
     marginBottom: 16,
     letterSpacing: 0.3
   },
   locationInfo: {
-    backgroundColor: '#F5F5F5',
+    backgroundColor: 'rgba(31, 41, 55, 0.9)',
     padding: 12,
-    borderRadius: 8,
-    marginBottom: 16
+    borderRadius: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(75, 85, 99, 0.5)'
   },
   input: {
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    backgroundColor: '#F8F9FA',
+    borderColor: 'rgba(75, 85, 99, 0.5)',
+    backgroundColor: 'rgba(31, 41, 55, 0.9)',
     borderRadius: 12,
     padding: 14,
     fontSize: 16,
     marginBottom: 16,
-    color: '#1E293B'
+    color: '#FFFFFF'
   },
   modalButtons: {
     flexDirection: 'row',
@@ -805,12 +959,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#8E8E93'
   },
   confirmButton: {
-    backgroundColor: '#2563EB',
-    shadowColor: '#2563EB',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 3
+    backgroundColor: '#10B981',
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
+    elevation: 4
   },
   modalButtonText: {
     fontSize: 16,

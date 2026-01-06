@@ -184,7 +184,7 @@ export default function RouteSelectionScreen({ navigation }) {
         <TextInput
           style={styles.searchInput}
           placeholder="Hat ara... (numara veya isim)"
-          placeholderTextColor="#999"
+          placeholderTextColor="#6B7280"
           value={searchQuery}
           onChangeText={setSearchQuery}
         />
@@ -225,29 +225,31 @@ export default function RouteSelectionScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA'
+    backgroundColor: '#111827'
   },
   centered: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F5F5F5'
+    backgroundColor: '#111827'
   },
   loadingText: {
     marginTop: 12,
     fontSize: 16,
-    color: '#666'
+    color: '#9CA3AF'
   },
   header: {
-    backgroundColor: '#2563EB',
+    backgroundColor: '#1F2937',
     padding: 20,
     paddingTop: 60,
     paddingBottom: 28,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
+    shadowOpacity: 0.3,
     shadowRadius: 8,
-    elevation: 8
+    elevation: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(16, 185, 129, 0.3)'
   },
   title: {
     fontSize: 28,
@@ -278,25 +280,25 @@ const styles = StyleSheet.create({
   searchContainer: {
     paddingHorizontal: 16,
     paddingVertical: 16,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#1F2937',
     flexDirection: 'row',
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.2,
     shadowRadius: 4,
-    elevation: 2
+    elevation: 3
   },
   searchInput: {
     flex: 1,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: '#374151',
     paddingHorizontal: 16,
     paddingVertical: 14,
     borderRadius: 12,
     fontSize: 16,
-    color: '#1E293B',
+    color: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#E2E8F0'
+    borderColor: 'rgba(75, 85, 99, 0.5)'
   },
   clearButton: {
     marginLeft: 10,
@@ -304,7 +306,7 @@ const styles = StyleSheet.create({
   },
   clearButtonText: {
     fontSize: 18,
-    color: '#999'
+    color: '#9CA3AF'
   },
   emptyContainer: {
     padding: 40,
@@ -312,23 +314,23 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
-    color: '#999'
+    color: '#6B7280'
   },
   listContent: {
     padding: 16
   },
   routeCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#1F2937',
     borderRadius: 16,
     marginBottom: 14,
     overflow: 'hidden',
-    elevation: 3,
+    elevation: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.3,
     shadowRadius: 12,
     borderWidth: 1,
-    borderColor: '#F1F5F9'
+    borderColor: 'rgba(75, 85, 99, 0.4)'
   },
   routeHeader: {
     flexDirection: 'row',
@@ -339,13 +341,13 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#2563EB',
+    backgroundColor: '#10B981',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,
-    shadowColor: '#2563EB',
+    shadowColor: '#10B981',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.4,
     shadowRadius: 6,
     elevation: 4
   },
@@ -359,7 +361,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     fontWeight: '600',
-    color: '#1E293B',
+    color: '#FFFFFF',
     letterSpacing: 0.2
   },
   directionButtons: {
