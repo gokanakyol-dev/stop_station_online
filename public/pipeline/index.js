@@ -106,23 +106,21 @@ export async function runStep1Pipeline(gpsRecords, options = {}) {
   const totalDistance = routeSkeleton[routeSkeleton.length - 1]?.distance ?? 0;
   step(`1E.4: ${routeSkeleton.length} nokta, ${(totalDistance / 1000).toFixed(2)} km`);
 
-  // GPS verilerinden durakları tespit et
+  // GPS verilerinden durakları tespit et - HER ZAMAN çalışsın
   let stopDetection = null;
   let stopComparison = null;
   
-  if (stops && stops.length > 0) {
-    step('1F - Durak Tespiti (GPS Durma Noktaları)...');
-    step(`1F.1: GPS yönü: ${selected.meanHeading.toFixed(0)}°, ${stops.length} gerçek durak karşılaştırılacak`);
-    
-    stopDetection = processDetectedStops(stops, routeSkeleton);
-    step(`1F.2: ${stopDetection.detectedStops.length} durak tespit edildi, ${stopDetection.filteredStops.length} filtrelendi`);
-    
-    // Gerçek duraklar ile tespit edilen durakları karşılaştır
-    if (stopDetection.detectedStops.length > 0) {
-      step('1G - Gerçek Duraklar ile Karşılaştırma...');
-      stopComparison = compareRealStopsWithGroupedStops(stops, stopDetection.detectedStops);
-      step(`1G: ${stopComparison.stats.matchedCount} eşleşme bulundu (${stopComparison.stats.matchRate})`);
-    }
+  step('1F - Durak Tespiti (GPS Durma Noktaları)...');
+  step(`1F.1: GPS yönü: ${selected.meanHeading.toFixed(0)}°, ${stops.length} gerçek durak referansı`);
+  
+  stopDetection = processDetectedStops(stops, routeSkeleton);
+  step(`1F.2: ${stopDetection.detectedStops.length} durak tespit edildi, ${stopDetection.filteredStops.length} filtrelendi`);
+  
+  // Gerçek duraklar ile tespit edilen durakları karşılaştır (sadece varsa)
+  if (stops && stops.length > 0 && stopDetection.detectedStops.length > 0) {
+    step('1G - Gerçek Duraklar ile Karşılaştırma...');
+    stopComparison = compareRealStopsWithGroupedStops(stops, stopDetection.detectedStops);
+    step(`1G: ${stopComparison.stats.matchedCount} eşleşme bulundu (${stopComparison.stats.matchRate})`);
   }
 
   return {
