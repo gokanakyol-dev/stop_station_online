@@ -42,6 +42,8 @@ export default function FieldMapScreen({ route, navigation }) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [newStopName, setNewStopName] = useState('');
   const [locationError, setLocationError] = useState(null);
+  const [mapSize, setMapSize] = useState('full'); // 'full' or 'minimized'
+  const [selectedLocation, setSelectedLocation] = useState(null);
   
   const mapRef = useRef(null);
   const locationSubscription = useRef(null);
@@ -194,16 +196,34 @@ export default function FieldMapScreen({ route, navigation }) {
       return;
     }
 
+    // Use selected location or user location
+    const locationToUse = selectedLocation || userLocation;
+    if (!locationToUse) {
+      Alert.alert('Hata', 'Konum bilgisi bulunamadı');
+      return;
+    }
+
+    // Calculate projection if not available
+    let projectionData = projection;
+    if (!projectionData && skeleton && locationToUse) {
+      projectionData = projectToRoute(skeleton, locationToUse.lat, locationToUse.lon);
+    }
+
+    if (!projectionData || projectionData.route_s === null || projectionData.route_s === undefined) {
+      Alert.alert('Hata', 'Rota üzerinde projeksiyon hesaplanamadı. Lütfen rotaya daha yakın olun.');
+      return;
+    }
+
     try {
       const result = await addStop(
         routeId,
         direction,
         {
-          lat: userLocation.lat,
-          lon: userLocation.lon,
-          route_s: projection.route_s,
-          lateral_offset: projection.lateral_offset,
-          side: projection.side
+          lat: locationToUse.lat,
+          lon: locationToUse.lon,
+          route_s: projectionData.route_s,
+          lateral_offset: projectionData.lateral_offset,
+          side: projectionData.side
         },
         newStopName
       );
@@ -214,10 +234,21 @@ export default function FieldMapScreen({ route, navigation }) {
 
       setShowAddModal(false);
       setNewStopName('');
+      setSelectedLocation(null);
       Alert.alert('✅', 'Yeni durak eklendi');
     } catch (error) {
       Alert.alert('Hata', error.message);
     }
+  };
+
+  const handleMapPress = (e) => {
+    const { latitude, longitude } = e.nativeEvent.coordinate;
+    setSelectedLocation({ lat: latitude, lon: longitude });
+    setShowAddModal(true);
+  };
+
+  const toggleMapSize = () => {
+    setMapSize(prev => prev === 'full' ? 'minimized' : 'full');
   };
 
   if (loading || !routeData) {
@@ -276,10 +307,12 @@ export default function FieldMapScreen({ route, navigation }) {
       {/* Harita */}
       <MapView
         ref={mapRef}
-        style={styles.map}
+        style={mapSize === 'full' ? styles.map : styles.mapMinimized}
         initialRegion={getInitialRegion()}
         showsUserLocation={true}
-        followsUserLocation={!locationError}
+        showsMyLocationButton={true}
+        followsUserLocation={false}
+        onPress={handleMapPress}
       >
         {/* Route çizgisi */}
         {getPolylineCoords().length > 0 && (
@@ -316,7 +349,35 @@ export default function FieldMapScreen({ route, navigation }) {
             strokeColor="rgba(255, 0, 0, 0.8)"
           />
         )}
+
+        {/* Kullanıcı konumu - Büyük mavi marker */}
+        {userLocation && (
+          <Marker
+            coordinate={{ latitude: userLocation.lat, longitude: userLocation.lon }}
+            title="Konumunuz"
+          >
+            <View style={styles.userLocationMarker}>
+              <View style={styles.userLocationInner} />
+            </View>
+          </Marker>
+        )}
+
+        {/* Seçilen konum - Yeni durak eklenecek yer */}
+        {selectedLocation && (
+          <Marker
+            coordinate={{ latitude: selectedLocation.lat, longitude: selectedLocation.lon }}
+            pinColor="#2563EB"
+            title="Yeni Durak"
+          />
+        )}
       </MapView>
+
+      {/* Harita büyüt/küçült butonu */}
+      <TouchableOpacity style={styles.mapToggleButton} onPress={toggleMapSize}>
+        <Text style={styles.mapToggleText}>
+          {mapSize === 'full' ? '▼ Küçült' : '▲ Büyüt'}
+        </Text>
+      </TouchableOpacity>
 
       {/* Üst bilgi paneli */}
       <View style={styles.topPanel}>
@@ -326,6 +387,15 @@ export default function FieldMapScreen({ route, navigation }) {
         <Text style={styles.directionInfo}>
           {direction === 'gidis' ? '→ GİDİŞ' : '← DÖNÜŞ'}
         </Text>
+        
+        {/* Proximity indicator */}
+        {projection && userLocation && (
+          <View style={styles.proximityIndicator}>
+            <Text style={styles.proximityText}>
+              📍 Rotada: {projection.route_s.toFixed(0)}m | Mesafe: {projection.lateral_offset.toFixed(0)}m
+            </Text>
+          </View>
+        )}
       </View>
 
       {/* Uyarı paneli */}
@@ -405,8 +475,17 @@ export default function FieldMapScreen({ route, navigation }) {
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Yeni Durak Ekle</Text>
             
+            {selectedLocation && (
+              <View style={styles.locationInfo}>
+                <Text style={{fontWeight: 'bold', marginBottom: 4}}>📍 Seçilen Konum:</Text>
+                <Text>Enlem: {selectedLocation.lat.toFixed(6)}</Text>
+                <Text>Boylam: {selectedLocation.lon.toFixed(6)}</Text>
+              </View>
+            )}
+            
             {projection && (
               <View style={styles.locationInfo}>
+                <Text style={{fontWeight: 'bold', marginBottom: 4}}>📊 Rota Bilgisi:</Text>
                 <Text>Route S: {projection.route_s.toFixed(1)} m</Text>
                 <Text>Uzaklık: {projection.lateral_offset.toFixed(1)} m</Text>
                 <Text>Taraf: {projection.side === 'LEFT' ? 'SOL' : 'SAĞ'}</Text>
@@ -458,6 +537,29 @@ const styles = StyleSheet.create({
   map: {
     flex: 1
   },
+  mapMinimized: {
+    height: 300
+  },
+  mapToggleButton: {
+    position: 'absolute',
+    top: 20,
+    right: 16,
+    backgroundColor: '#2563EB',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    zIndex: 100
+  },
+  mapToggleText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 13
+  },
   topPanel: {
     position: 'absolute',
     top: 60,
@@ -485,6 +587,33 @@ const styles = StyleSheet.create({
     color: '#2563EB',
     marginTop: 4,
     fontWeight: '600'
+  },
+  proximityIndicator: {
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0'
+  },
+  proximityText: {
+    fontSize: 13,
+    color: '#64748B',
+    fontWeight: '600'
+  },
+  userLocationMarker: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'rgba(37, 99, 235, 0.3)',
+    borderWidth: 3,
+    borderColor: '#2563EB',
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  userLocationInner: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#2563EB'
   },
   errorBanner: {
     position: 'absolute',

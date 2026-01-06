@@ -10,6 +10,16 @@ import {
   TextInput
 } from 'react-native';
 import { getRoutes } from '../services/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const getCachedData = async (key) => {
+  try {
+    const cached = await AsyncStorage.getItem(key);
+    return cached ? JSON.parse(cached) : null;
+  } catch {
+    return null;
+  }
+};
 
 export default function RouteSelectionScreen({ navigation }) {
   const [routes, setRoutes] = useState([]);
@@ -44,6 +54,16 @@ export default function RouteSelectionScreen({ navigation }) {
     try {
       setLoading(true);
       setIsOffline(false);
+      
+      // Önce cache'den hızlı yükleme
+      const cachedData = await getCachedData('routes');
+      if (cachedData) {
+        setRoutes(cachedData);
+        setFilteredRoutes(cachedData);
+        setLoading(false); // Hemen loading'i kapat
+      }
+      
+      // Arka planda güncel veriyi çek
       const data = await getRoutes();
       setRoutes(data);
       setFilteredRoutes(data);
