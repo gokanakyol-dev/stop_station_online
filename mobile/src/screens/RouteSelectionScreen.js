@@ -169,7 +169,10 @@ export default function RouteSelectionScreen({ navigation }) {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>DURAK DOĞRULAMA</Text>
-        <Text style={styles.subtitle}>Hat ve yön seçin</Text>
+        <View style={styles.subtitleRow}>
+          <Text style={styles.subtitle}>Hat ve yön seçin</Text>
+          <Text style={styles.version}>v1.1</Text>
+        </View>
       </View>
 
       {isOffline && (
@@ -258,11 +261,25 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     letterSpacing: 0.5
   },
+  subtitleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center'
+  },
   subtitle: {
     fontSize: 15,
     color: '#FFFFFF',
     opacity: 0.85,
     fontWeight: '400'
+  },
+  version: {
+    fontSize: 13,
+    color: '#10B981',
+    fontWeight: '700',
+    backgroundColor: 'rgba(16, 185, 129, 0.2)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12
   },
   offlineBanner: {
     backgroundColor: '#FFA500',
