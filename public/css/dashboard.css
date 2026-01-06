@@ -97,18 +97,18 @@ body {
 
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
   margin-bottom: 24px;
 }
 
 .stat-card {
   background: rgba(255, 255, 255, 0.95);
-  padding: 24px;
-  border-radius: 12px;
+  padding: 16px;
+  border-radius: 10px;
   text-align: center;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
-  border-left: 4px solid;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  border-left: 3px solid;
 }
 
 .stat-approve {
@@ -127,10 +127,14 @@ body {
   border-color: #FFD60A;
 }
 
+.stat-stops {
+  border-color: #5856D6;
+}
+
 .stat-number {
-  font-size: 48px;
+  font-size: 32px;
   font-weight: bold;
-  margin-bottom: 8px;
+  margin-bottom: 4px;
 }
 
 .stat-approve .stat-number {
@@ -149,8 +153,12 @@ body {
   color: #FFD60A;
 }
 
+.stat-stops .stat-number {
+  color: #5856D6;
+}
+
 .stat-label {
-  font-size: 14px;
+  font-size: 11px;
   color: #666;
   font-weight: 600;
   text-transform: uppercase;

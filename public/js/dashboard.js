@@ -10,6 +10,7 @@ let routes = [];
 let map = null;
 let markersLayer = null;
 let routeLayer = null;
+let currentRouteData = null; // Seçili rota verisi
 
 // Sayfa yüklendiğinde
 document.addEventListener('DOMContentLoaded', async () => {
@@ -18,7 +19,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   await loadActions();
   
   // Event listeners
-  document.getElementById('refreshBtn').addEventListener('click', loadActions);
+  document.getElementById('refreshBtn').addEventListener('click', () => {
+    const routeId = document.getElementById('routeFilter').value;
+    if (routeId) {
+      onRouteFilterChange();
+    } else {
+      alert('Lütfen önce bir hat seçin');
+    }
+  });
   document.getElementById('routeFilter').addEventListener('change', onRouteFilterChange);
   document.getElementById('directionFilter').addEventListener('change', () => {
     onRouteFilterChange(); // Hem haritayı güncelle hem filtreleri uygula
@@ -63,15 +71,29 @@ async function loadActions() {
   }
 }
 
-// İstatistikleri güncelle
+// İstatistikleri güncelle - Seçilen hat ve yöne göre
 function updateStats() {
+  const routeId = document.getElementById('routeFilter').value;
+  const direction = document.getElementById('directionFilter').value;
+  
+  // Filtrelenmiş aksiyonlar
+  let filteredActions = allActions;
+  if (routeId) {
+    filteredActions = filteredActions.filter(a => a.route_id == routeId);
+  }
+  if (direction) {
+    filteredActions = filteredActions.filter(a => a.direction === direction);
+  }
+  
   const stats = {
-    approve: allActions.filter(a => a.action_type === 'APPROVE').length,
-    reject: allActions.filter(a => a.action_type === 'REJECT').length,
-    add: allActions.filter(a => a.action_type === 'ADD').length,
-    total: allActions.length
+    stops: currentRouteData?.stops?.length || 0,
+    approve: filteredActions.filter(a => a.action_type === 'APPROVE').length,
+    reject: filteredActions.filter(a => a.action_type === 'REJECT').length,
+    add: filteredActions.filter(a => a.action_type === 'ADD').length,
+    total: filteredActions.length
   };
   
+  document.getElementById('statStops').textContent = stats.stops;
   document.getElementById('statApprove').textContent = stats.approve;
   document.getElementById('statReject').textContent = stats.reject;
   document.getElementById('statAdd').textContent = stats.add;
@@ -177,7 +199,13 @@ async function onRouteFilterChange() {
     // Haritayı temizle
     markersLayer.clearLayers();
     routeLayer.clearLayers();
-  }
+  }Veriyi sakla
+    currentRouteData = data;
+    
+    // İstatistikleri güncelle
+    updateStats();
+    
+    // 
 }
 
 // Rotayı haritada göster
