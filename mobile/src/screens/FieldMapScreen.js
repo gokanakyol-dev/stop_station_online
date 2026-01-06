@@ -58,6 +58,7 @@ export default function FieldMapScreen({ route, navigation }) {
   const [locationError, setLocationError] = useState(null);
   const [mapSize, setMapSize] = useState('full'); // 'full' or 'minimized'
   const [selectedLocation, setSelectedLocation] = useState(null);
+  const [selectedProjection, setSelectedProjection] = useState(null);
   
   const mapRef = useRef(null);
   const locationSubscription = useRef(null);
@@ -217,28 +218,26 @@ export default function FieldMapScreen({ route, navigation }) {
       return;
     }
 
-    // Calculate projection if not available
-    let projectionData = projection;
+    // Use selectedProjection or calculate new one
+    let projectionData = selectedProjection || projection;
     if (!projectionData && skeleton && locationToUse) {
       projectionData = projectToRoute(skeleton, locationToUse.lat, locationToUse.lon);
     }
 
-    if (!projectionData || projectionData.route_s === null || projectionData.route_s === undefined) {
-      Alert.alert('Hata', 'Rota üzerinde projeksiyon hesaplanamadı. Lütfen rotaya daha yakın olun.');
-      return;
-    }
+    // Projeksiyon yoksa veya geçersizse, null değerlerle ekle
+    const stopData = {
+      lat: locationToUse.lat,
+      lon: locationToUse.lon,
+      route_s: projectionData?.route_s ?? null,
+      lateral_offset: projectionData?.lateral_offset ?? null,
+      side: projectionData?.side ?? null
+    };
 
     try {
       const result = await addStop(
         routeId,
         direction,
-        {
-          lat: locationToUse.lat,
-          lon: locationToUse.lon,
-          route_s: projectionData.route_s,
-          lateral_offset: projectionData.lateral_offset,
-          side: projectionData.side
-        },
+        stopData,
         newStopName
       );
 
@@ -249,6 +248,7 @@ export default function FieldMapScreen({ route, navigation }) {
       setShowAddModal(false);
       setNewStopName('');
       setSelectedLocation(null);
+      setSelectedProjection(null);
       Alert.alert('✅', 'Yeni durak eklendi');
     } catch (error) {
       Alert.alert('Hata', error.message);
@@ -274,6 +274,7 @@ export default function FieldMapScreen({ route, navigation }) {
                 text: 'Ekle', 
                 onPress: () => {
                   setSelectedLocation({ lat: latitude, lon: longitude });
+                  setSelectedProjection(null);
                   setShowAddModal(true);
                 }
               }
@@ -293,6 +294,7 @@ export default function FieldMapScreen({ route, navigation }) {
                 text: 'Ekle', 
                 onPress: () => {
                   setSelectedLocation({ lat: latitude, lon: longitude });
+                  setSelectedProjection(projectionData);
                   setShowAddModal(true);
                 }
               }
@@ -303,6 +305,7 @@ export default function FieldMapScreen({ route, navigation }) {
         
         // 500m içindeyse direkt ekle
         setSelectedLocation({ lat: latitude, lon: longitude });
+        setSelectedProjection(projectionData);
         setShowAddModal(true);
       } catch (error) {
         Alert.alert('Hata', 'Projeksiyon hesaplama hatası. Lütfen tekrar deneyin.');
