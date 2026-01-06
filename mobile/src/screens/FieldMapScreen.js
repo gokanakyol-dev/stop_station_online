@@ -221,7 +221,7 @@ export default function FieldMapScreen({ route, navigation }) {
     // Use selectedProjection or calculate new one
     let projectionData = selectedProjection || projection;
     if (!projectionData && skeleton && locationToUse) {
-      projectionData = projectToRoute(skeleton, locationToUse.lat, locationToUse.lon);
+      projectionData = projectToRoute({ lat: locationToUse.lat, lon: locationToUse.lon }, skeleton);
     }
 
     // Projeksiyon yoksa veya geçersizse, null değerlerle ekle
@@ -261,7 +261,7 @@ export default function FieldMapScreen({ route, navigation }) {
     // Projeksiyon hesapla
     if (skeleton) {
       try {
-        const projectionData = projectToRoute(skeleton, latitude, longitude);
+        const projectionData = projectToRoute({ lat: latitude, lon: longitude }, skeleton);
         
         // Projeksiyon hesaplanamadıysa bile devam et
         if (!projectionData || projectionData.lateral_offset === null || projectionData.lateral_offset === undefined) {
