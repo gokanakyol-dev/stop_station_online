@@ -256,63 +256,78 @@ export default function FieldMapScreen({ route, navigation }) {
   };
 
   const handleMapPress = (e) => {
-    const { latitude, longitude } = e.nativeEvent.coordinate;
-    
-    // Projeksiyon hesapla
-    if (skeleton) {
-      try {
-        const projectionData = projectToRoute({ lat: latitude, lon: longitude }, skeleton);
-        
-        // Projeksiyon hesaplanamadıysa bile devam et
-        if (!projectionData || projectionData.lateral_offset === null || projectionData.lateral_offset === undefined) {
-          Alert.alert(
-            'Projeksiyon Hesaplanamadı',
-            'Bu nokta rota dışında. Yine de durak olarak eklemek ister misiniz?',
-            [
-              { text: 'İptal', style: 'cancel' },
-              { 
-                text: 'Ekle', 
-                onPress: () => {
-                  setSelectedLocation({ lat: latitude, lon: longitude });
-                  setSelectedProjection(null);
-                  setShowAddModal(true);
-                }
-              }
-            ]
-          );
-          return;
-        }
-        
-        // Rotaya 500m'den uzaksa onay iste
-        if (projectionData.lateral_offset > 500) {
-          Alert.alert(
-            'Projeksiyon Alanı Dışında',
-            `Seçilen nokta rotaya ${projectionData.lateral_offset.toFixed(0)}m uzakta. Yine de eklemek istiyor musunuz?`,
-            [
-              { text: 'İptal', style: 'cancel' },
-              { 
-                text: 'Ekle', 
-                onPress: () => {
-                  setSelectedLocation({ lat: latitude, lon: longitude });
-                  setSelectedProjection(projectionData);
-                  setShowAddModal(true);
-                }
-              }
-            ]
-          );
-          return;
-        }
-        
-        // 500m içindeyse direkt ekle
+    try {
+      const { latitude, longitude } = e.nativeEvent.coordinate;
+      
+      console.log('handleMapPress called:', { latitude, longitude });
+      console.log('skeleton exists:', !!skeleton, skeleton ? skeleton.length : 0);
+      
+      // Skeleton yoksa doğrudan modal aç
+      if (!skeleton || skeleton.length < 2) {
+        console.log('No skeleton, opening modal directly');
         setSelectedLocation({ lat: latitude, lon: longitude });
-        setSelectedProjection(projectionData);
+        setSelectedProjection(null);
         setShowAddModal(true);
-      } catch (error) {
-        Alert.alert('Hata', 'Projeksiyon hesaplama hatası. Lütfen tekrar deneyin.');
-        if (__DEV__) console.error('Projeksiyon hatası:', error);
+        return;
       }
-    } else {
-      Alert.alert('Hata', 'Rota bilgisi yüklenmedi. Lütfen bekleyin.');
+      
+      // Projeksiyon hesapla
+      let projectionData = null;
+      try {
+        projectionData = projectToRoute({ lat: latitude, lon: longitude }, skeleton);
+        console.log('Projection result:', projectionData);
+      } catch (projErr) {
+        console.error('Projection calculation error:', projErr);
+        // Projeksiyon hatası olsa bile devam et
+      }
+      
+      // Projeksiyon hesaplanamadıysa bile devam et
+      if (!projectionData || projectionData.lateral_offset === null || projectionData.lateral_offset === undefined) {
+        Alert.alert(
+          'Projeksiyon Hesaplanamadı',
+          'Bu nokta rota dışında. Yine de durak olarak eklemek ister misiniz?',
+          [
+            { text: 'İptal', style: 'cancel' },
+            { 
+              text: 'Ekle', 
+              onPress: () => {
+                setSelectedLocation({ lat: latitude, lon: longitude });
+                setSelectedProjection(null);
+                setShowAddModal(true);
+              }
+            }
+          ]
+        );
+        return;
+      }
+      
+      // Rotaya 500m'den uzaksa onay iste
+      if (projectionData.lateral_offset > 500) {
+        Alert.alert(
+          'Projeksiyon Alanı Dışında',
+          `Seçilen nokta rotaya ${projectionData.lateral_offset.toFixed(0)}m uzakta. Yine de eklemek istiyor musunuz?`,
+          [
+            { text: 'İptal', style: 'cancel' },
+            { 
+              text: 'Ekle', 
+              onPress: () => {
+                setSelectedLocation({ lat: latitude, lon: longitude });
+                setSelectedProjection(projectionData);
+                setShowAddModal(true);
+              }
+            }
+          ]
+        );
+        return;
+      }
+      
+      // 500m içindeyse direkt ekle
+      setSelectedLocation({ lat: latitude, lon: longitude });
+      setSelectedProjection(projectionData);
+      setShowAddModal(true);
+    } catch (error) {
+      console.error('handleMapPress error:', error);
+      Alert.alert('Hata', 'Bir hata oluştu. Lütfen tekrar deneyin.');
     }
   };
 
