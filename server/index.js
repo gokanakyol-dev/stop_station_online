@@ -18,7 +18,17 @@ const PORT = process.env.PORT || 3000;
 // CORS için mobil uygulamayı destekle
 app.use(cors());
 app.use(express.json({ limit: '20mb' }));
-app.use(express.static(path.join(__dirname, '../public')));
+
+// Static dosyalar için NO CACHE - her seferinde yeni dosya çek
+app.use(express.static(path.join(__dirname, '../public'), {
+  etag: false,
+  maxAge: 0,
+  setHeaders: (res, path) => {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+  }
+}));
 
 // In-memory job status (örnek, ileride Supabase'e taşınacak)
 let lastJob = { status: 'idle', result: null, error: null };
