@@ -657,7 +657,7 @@ const styles = StyleSheet.create({
   },
   topPanel: {
     position: 'absolute',
-    top: 50,
+    top: 120,
     left: 16,
     right: 16,
     flexDirection: 'row',
@@ -666,17 +666,19 @@ const styles = StyleSheet.create({
     zIndex: 10
   },
   backButtonCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.98)',
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 5,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.05)'
   },
   backButtonText: {
     fontSize: 20,
@@ -685,38 +687,46 @@ const styles = StyleSheet.create({
   },
   routeInfoCard: {
     flex: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    borderRadius: 22,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.98)',
+    borderRadius: 24,
+    paddingVertical: 14,
+    paddingHorizontal: 18,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 5,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.05)'
   },
   routeInfo: {
-    fontSize: 18,
-    fontWeight: '800',
+    fontSize: 17,
+    fontWeight: '700',
     color: '#1F2937',
-    letterSpacing: 0.3
+    letterSpacing: 0.2
   },
   routeName: {
-    fontSize: 13,
+    fontSize: 12,
     color: '#6B7280',
-    marginTop: 2,
-    fontWeight: '500'
+    marginTop: 4,
+    fontWeight: '500',
+    letterSpacing: 0.1
   },
   directionBadge: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: '#10B981',
     justifyContent: 'center',
-    alignItems: 'center'
+    alignItems: 'center',
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3
   },
   directionBadgeText: {
     fontSize: 16,
@@ -781,14 +791,19 @@ const styles = StyleSheet.create({
   },
   errorBanner: {
     position: 'absolute',
-    top: 120,
+    top: 220,
     left: 16,
     right: 16,
     backgroundColor: '#FF9500',
-    borderRadius: 8,
-    padding: 12,
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
     zIndex: 100,
-    elevation: 5
+    elevation: 5,
+    shadowColor: '#FF9500',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6
   },
   errorText: {
     color: '#FFFFFF',
@@ -797,19 +812,20 @@ const styles = StyleSheet.create({
   },
   warningPanel: {
     position: 'absolute',
-    top: 200,
+    top: 310,
     left: 16,
     right: 16,
-    backgroundColor: 'rgba(17, 24, 39, 0.95)',
-    borderRadius: 16,
-    padding: 14,
+    backgroundColor: 'rgba(17, 24, 39, 0.96)',
+    borderRadius: 18,
+    paddingVertical: 16,
+    paddingHorizontal: 18,
     elevation: 6,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
     borderWidth: 1,
-    borderColor: 'rgba(75, 85, 99, 0.3)'
+    borderColor: 'rgba(75, 85, 99, 0.4)'
   },
   warningItem: {
     flexDirection: 'row',
