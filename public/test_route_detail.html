@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <title>API Route Detail Test</title>
+  <style>body{font-family:monospace;padding:2em;}button{margin:0.5em 0;}</style>
+</head>
+<body>
+  <h2>/api/routes/:routeId/direction/:direction Test</h2>
+  <label>Route ID: <input id="routeId" value="114" size="5"></label>
+  <label>Yön: 
+    <select id="direction">
+      <option value="gidis">Gidiş</option>
+      <option value="donus">Dönüş</option>
+    </select>
+  </label>
+  <button onclick="testRouteDetail()">Test Et</button>
+  <pre id="result">Sonuç burada...</pre>
+  <script>
+    async function testRouteDetail() {
+      const routeId = document.getElementById('routeId').value;
+      const direction = document.getElementById('direction').value;
+      const url = `/api/routes/${routeId}/direction/${direction}`;
+      document.getElementById('result').textContent = 'Yükleniyor...';
+      try {
+        const res = await fetch(url);
+        const data = await res.json();
+        document.getElementById('result').textContent = JSON.stringify(data, null, 2);
+      } catch (e) {
+        document.getElementById('result').textContent = 'Hata: ' + e;
+      }
+    }
+  </script>
+</body>
+</html>

@@ -199,13 +199,7 @@ async function onRouteFilterChange() {
     // Haritayı temizle
     markersLayer.clearLayers();
     routeLayer.clearLayers();
-  }Veriyi sakla
-    currentRouteData = data;
-    
-    // İstatistikleri güncelle
-    updateStats();
-    
-    // 
+  }
 }
 
 // Rotayı haritada göster
@@ -221,8 +215,8 @@ async function loadRouteOnMap(routeId, direction) {
     
     // Polyline çiz
     if (data.route && data.route.polyline && data.route.polyline.length > 0) {
-      const coordinates = data.route.polyline.map(p => [p.lat, p.lon]);
-      const polyline = L.polyline(coordinates, {
+      // Polyline zaten [[lat, lon], ...] formatında
+      const polyline = L.polyline(data.route.polyline, {
         color: '#10B981',
         weight: 4,
         opacity: 0.8
@@ -264,6 +258,11 @@ async function loadRouteOnMap(routeId, direction) {
           .addTo(markersLayer);
       });
     }
+    
+    // Veriyi sakla ve istatistikleri güncelle
+    currentRouteData = data;
+    updateStats();
+    
   } catch (error) {
     console.error('Route map load error:', error);
   }

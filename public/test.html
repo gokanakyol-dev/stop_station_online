@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>API Test</title>
+</head>
+<body>
+    <h1>API Test</h1>
+    <button onclick="testRoutes()">Test Routes</button>
+    <button onclick="testActions()">Test Actions</button>
+    <pre id="output"></pre>
+
+    <script>
+        async function testRoutes() {
+            try {
+                const response = await fetch('/api/routes');
+                const data = await response.json();
+                document.getElementById('output').textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                document.getElementById('output').textContent = 'ERROR: ' + error.message;
+            }
+        }
+
+        async function testActions() {
+            try {
+                const response = await fetch('/api/field/actions');
+                const data = await response.json();
+                document.getElementById('output').textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                document.getElementById('output').textContent = 'ERROR: ' + error.message;
+            }
+        }
+    </script>
+</body>
+</html>
