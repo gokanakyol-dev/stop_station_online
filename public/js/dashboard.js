@@ -20,7 +20,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Event listeners
   document.getElementById('refreshBtn').addEventListener('click', loadActions);
   document.getElementById('routeFilter').addEventListener('change', onRouteFilterChange);
-  document.getElementById('directionFilter').addEventListener('change', filterActions);
+  document.getElementById('directionFilter').addEventListener('change', () => {
+    onRouteFilterChange(); // Hem haritayı güncelle hem filtreleri uygula
+  });
   document.getElementById('actionFilter').addEventListener('change', filterActions);
 });
 
@@ -74,9 +76,7 @@ function updateStats() {
   document.getElementById('statReject').textContent = stats.reject;
   document.getElementById('statAdd').textContent = stats.add;
   document.getElementById('statTotal').textContent = stats.total;
-}
-
-// Aksiyonları göster
+} - Kompakt tek satır format
 function displayActions(actions) {
   const container = document.getElementById('actionsList');
   
@@ -85,14 +85,16 @@ function displayActions(actions) {
     return;
   }
   
-  container.innerHTML = actions.map(action => {
+  // Maksimum 6 işlem göster
+  const limitedActions = actions.slice(0, 6);
+  
+  container.innerHTML = limitedActions.map(action => {
     const date = new Date(action.timestamp);
     const timeStr = date.toLocaleString('tr-TR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
+      day: '2-digit',
+      month: '2-digit'
     });
     
     const stopName = action.stops?.name || 'Bilinmeyen Durak';
@@ -106,21 +108,9 @@ function displayActions(actions) {
     
     return `
       <div class="action-item action-${action.action_type}">
-        <div class="action-header">
-          <span class="action-type type-${action.action_type}">
-            ${typeEmoji} ${action.action_type}
-          </span>
-          <span class="action-time">${timeStr}</span>
-        </div>
-        
-        <div class="action-stop-name">${stopName}</div>
-        
-        <div class="action-details">
-          <div><strong>Hat:</strong> ${action.route_id}</div>
-          <div><strong>Yön:</strong> ${action.direction === 'gidis' ? 'Gidiş' : 'Dönüş'}</div>
-          <div><strong>Route S:</strong> ${action.route_s?.toFixed(1) || 'N/A'} m</div>
-          <div><strong>Uzaklık:</strong> ${action.lateral_offset?.toFixed(1) || 'N/A'} m</div>
-          <div><strong>Taraf:</strong> ${action.side === 'LEFT' ? 'Sol' : 'Sağ'}</div>
+        <span class="action-type-mini type-${action.action_type}">${typeEmoji}</span>
+        <span class="action-time-mini">${timeStr}</span>
+        <span class="action-info">Hat ${action.route_id} • ${stopName} • ${action.direction === 'gidis' ? 'Gidiş' : 'Dönüş'} • ${action.route_s?.toFixed(0) || 'N/A'}m</spanv><strong>Taraf:</strong> ${action.side === 'LEFT' ? 'Sol' : 'Sağ'}</div>
           ${action.notes ? `<div><strong>Not:</strong> ${action.notes}</div>` : ''}
         </div>
       </div>
@@ -171,13 +161,19 @@ function initMap() {
 // Hat filtresi değiştiğinde
 async function onRouteFilterChange() {
   const routeId = document.getElementById('routeFilter').value;
-  const direction = document.getElementById('directionFilter').value || 'gidis';
+  let direction = document.getElementById('directionFilter').value;
+  
+  // Eğer direction seçilmemişse varsayılan olarak 'gidis' kullan
+  if (!direction) {
+    direction = 'gidis';
+  }
   
   // Aksiyonları filtrele
   filterActions();
   
   // Haritada göster
   if (routeId) {
+    console.log('Loading route on map:', routeId, direction);
     await loadRouteOnMap(routeId, direction);
   } else {
     // Haritayı temizle

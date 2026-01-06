@@ -173,17 +173,21 @@ body {
 }
 
 .actions-list {
-  max-height: 600px;
+  max-height: 200px;
   overflow-y: auto;
 }
 
 .action-item {
   background: #f8f9fa;
-  padding: 16px;
-  border-radius: 8px;
-  margin-bottom: 12px;
-  border-left: 4px solid;
+  padding: 8px 12px;
+  border-radius: 6px;
+  margin-bottom: 6px;
+  border-left: 3px solid;
   transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
 }
 
 .action-item:hover {
@@ -201,6 +205,43 @@ body {
 
 .action-item.action-ADD {
   border-color: #007AFF;
+}
+
+.action-type-mini {
+  padding: 3px 8px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: white;
+  flex-shrink: 0;
+}
+
+.action-type-mini.type-APPROVE {
+  background: #34C759;
+}
+
+.action-type-mini.type-REJECT {
+  background: #FF3B30;
+}
+
+.action-type-mini.type-ADD {
+  background: #007AFF;
+}
+
+.action-time-mini {
+  font-size: 11px;
+  color: #999;
+  flex-shrink: 0;
+  min-width: 70px;
+}
+
+.action-info {
+  font-size: 12px;
+  color: #555;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .action-header {
