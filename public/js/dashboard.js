@@ -32,6 +32,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     onRouteFilterChange(); // Hem haritayı güncelle hem filtreleri uygula
   });
   document.getElementById('actionFilter').addEventListener('change', filterActions);
+  document.getElementById('downloadBtn').addEventListener('click', downloadStopsCSV);
 });
 
 // Hatları yükle
@@ -266,4 +267,59 @@ async function loadRouteOnMap(routeId, direction) {
   } catch (error) {
     console.error('Route map load error:', error);
   }
+}
+
+// Durakları CSV olarak indir
+function downloadStopsCSV() {
+  const routeId = document.getElementById('routeFilter').value;
+  const direction = document.getElementById('directionFilter').value;
+  
+  if (!routeId) {
+    alert('Lütfen önce bir hat seçin');
+    return;
+  }
+  
+  if (!currentRouteData || !currentRouteData.stops) {
+    alert('Önce "Haritada Göster" butonuna tıklayarak durakları yükleyin');
+    return;
+  }
+  
+  // CSV başlıkları
+  const headers = ['Hat No', 'Hat Adı', 'Yön', 'Sıra', 'Durak Adı', 'Enlem', 'Boylam', 'Route S (m)', 'Onaylandı', 'Reddedildi'];
+  
+  // CSV satırları
+  const rows = currentRouteData.stops.map(stop => [
+    currentRouteData.route.route_number,
+    currentRouteData.route.route_name,
+    direction === 'gidis' ? 'Gidiş' : 'Dönüş',
+    stop.sequence_number || '',
+    stop.name || '',
+    stop.lat,
+    stop.lon,
+    stop.route_s?.toFixed(2) || '',
+    stop.field_verified ? 'Evet' : 'Hayır',
+    stop.field_rejected ? 'Evet' : 'Hayır'
+  ]);
+  
+  // CSV içeriği oluştur
+  const csvContent = [
+    headers.join(','),
+    ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+  ].join('\n');
+  
+  // BOM ekle (Excel Türkçe karakter desteği için)
+  const BOM = '\uFEFF';
+  const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
+  
+  // İndir
+  const link = document.createElement('a');
+  const url = URL.createObjectURL(blob);
+  const fileName = `duraklar_${currentRouteData.route.route_number}_${direction}_${new Date().toISOString().split('T')[0]}.csv`;
+  
+  link.setAttribute('href', url);
+  link.setAttribute('download', fileName);
+  link.style.visibility = 'hidden';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
 }
