@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🚏 Stop Station</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+        <h1>🚏 Stop Station</h1>
+        <a href="/dashboard.html" style="background: #10B981; color: white; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-weight: 500; font-size: 14px;">📊 Saha Kontrol Paneli</a>
+      </div>
+      <p>GPS verisinden otobüs durağı tespiti</p>
+    </header>
+
+    <!-- HAT YÖNETİMİ - YENİ BÖLÜM -->
+    <div class="card">
+      <h2>🚌 Hat ve Durak Yönetimi</h2>
+      
+      <div class="tabs">
+        <button class="tab-btn active" data-tab="routes-tab">Hatlar</button>
+        <button class="tab-btn" data-tab="stops-tab">Duraklar</button>
+      </div>
+
+      <div id="routes-tab" class="tab-content active">
+        <div class="management-header">
+          <input type="text" id="routeSearch" placeholder="Hat ara..." class="search-input">
+          <button id="btnRefreshRoutes" class="btn-icon" title="Yenile">🔄</button>
+        </div>
+        
+        <div id="routesList" class="items-list">
+          <p class="loading-text">Hatlar yükleniyor...</p>
+        </div>
+        
+        <div class="add-form" id="addRouteForm" style="display: none;">
+          <h4>➕ Yeni Hat Ekle</h4>
+          <input type="text" id="newRouteNumber" placeholder="Hat No (örn: 103)">
+          <input type="text" id="newRouteName" placeholder="Hat Adı (örn: Konak - Karşıyaka)">
+          <div class="form-buttons">
+            <button id="btnSaveRoute" class="btn-primary btn-sm">💾 Kaydet</button>
+            <button id="btnCancelRoute" class="btn-secondary btn-sm">İptal</button>
+          </div>
+        </div>
+        
+        <button id="btnAddRoute" class="btn-success btn-block">➕ Yeni Hat Ekle</button>
+      </div>
+
+      <div id="stops-tab" class="tab-content">
+        <div class="management-header">
+          <select id="stopRouteFilter" class="select-input">
+            <option value="">Tüm Hatlar</option>
+          </select>
+          <select id="stopDirectionFilter" class="select-input">
+            <option value="">Tüm Yönler</option>
+            <option value="gidis">Gidiş</option>
+            <option value="donus">Dönüş</option>
+          </select>
+        </div>
+        
+        <div id="stopsList" class="items-list">
+          <p class="loading-text">Duraklar yükleniyor...</p>
+        </div>
+        
+        <div class="add-form" id="addStopForm" style="display: none;">
+          <h4>➕ Yeni Durak Ekle</h4>
+          <select id="newStopRoute" class="select-input">
+            <option value="">Hat Seç</option>
+          </select>
+          <select id="newStopDirection" class="select-input">
+            <option value="gidis">Gidiş</option>
+            <option value="donus">Dönüş</option>
+          </select>
+          <input type="text" id="newStopName" placeholder="Durak Adı">
+          <input type="number" id="newStopLat" placeholder="Enlem" step="0.000001">
+          <input type="number" id="newStopLon" placeholder="Boylam" step="0.000001">
+          <div class="form-buttons">
+            <button id="btnSaveStop" class="btn-primary btn-sm">💾 Kaydet</button>
+            <button id="btnCancelStop" class="btn-secondary btn-sm">İptal</button>
+          </div>
+        </div>
+        
+        <button id="btnAddStop" class="btn-success btn-block">➕ Yeni Durak Ekle</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>📂 Veri Yükleme</h2>
+      <div class="form-group">
+        <label>GPS CSV Dosyası</label>
+        <input type="file" id="csvFile" accept=".csv">
+        <small>Sütunlar: SeferId, Plaka, lineId, routeId, Enlem, Boylam, KonumZamani, Hiz</small>
+      </div>
+
+      <div class="form-group">
+        <label>Durak JSON</label>
+        <input type="file" id="stopsFile" accept=".json">
+        <small>direction/yon property ile gidiş/dönüş bilgisi olmalı</small>
+      </div>
+
+      <div class="form-group">
+        <label>Yön Filtresi</label>
+        <select id="directionFilter">
+          <option value="all">Tümü</option>
+          <option value="gidis">Sadece Gidiş</option>
+          <option value="donus">Sadece Dönüş</option>
+        </select>
+        <small><strong>⚠️ Önemli:</strong> GPS verisi tek yön içeriyorsa (örn. sadece gidiş), pipeline çalıştırmadan önce o yönü seçin!</small>
+      </div>
+
+      <div class="button-group">
+        <button id="btnPipeline" class="btn-primary" disabled>
+          <span class="btn-text">🔄 Pipeline Çalıştır</span>
+          <span class="loader" style="display:none;">⏳ Yükleniyor...</span>
+        </button>
+        <button id="btnSavePipeline" class="btn-success" disabled style="display:none;">
+          💾 Sonucu Kaydet
+        </button>
+        <button id="btnClear" class="btn-secondary">🗑️ Temizle</button>
+      </div>
+
+      <!-- Hat ve Yön Seçimi (kaydetme için) -->
+      <div id="saveRoutePanel" class="form-group" style="display:none; margin-top: 16px; padding: 16px; background: #f0fdf4; border-radius: 8px; border: 2px solid #10B981;">
+        <h4 style="margin: 0 0 12px 0; color: #10B981;">💾 Pipeline Sonucunu Kaydet</h4>
+        <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+          <select id="saveRouteSelect" class="select-input" style="flex: 1; min-width: 200px;">
+            <option value="">Hat Seç...</option>
+          </select>
+          <select id="saveDirectionSelect" class="select-input" style="width: 120px;">
+            <option value="gidis">Gidiş</option>
+            <option value="donus">Dönüş</option>
+          </select>
+          <button id="btnConfirmSave" class="btn-success">💾 Kaydet</button>
+        </div>
+        <small style="display: block; margin-top: 8px; color: #6B7280;">Tespit edilen rota ve duraklar seçilen hatta kaydedilecek.</small>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>🗺️ Harita</h2>
+      <div id="map"></div>
+        <button id="btnDownloadStops" class="btn-secondary" style="margin-top: 16px;">⬇️ Tespit Edilen Durakları İndir (CSV)</button>
+    </div>
+
+    <div class="card" id="comparisonCard" style="display: none;">
+      <h2>🔍 Gerçek Duraklar vs Tespit Edilen Duraklar</h2>
+      <div id="comparisonResults"></div>
+    </div>
+
+    <div class="card">
+      <h2>📋 Log</h2>
+      <pre id="output">Hazır. CSV ve durak JSON yükleyin.</pre>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script type="module" src="/js/app.js"></script>
+</body>
+</html>

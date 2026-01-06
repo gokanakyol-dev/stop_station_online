@@ -4,160 +4,743 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>🚏 Stop Station</title>
+  
+  <!-- Bootstrap 5 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  
+  <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <link rel="stylesheet" href="/css/style.css">
+  
+  <style>
+    :root {
+      --sidebar-width: 260px;
+      --primary-color: #4F46E5;
+      --secondary-color: #10B981;
+    }
+    
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f8fafc;
+      margin: 0;
+      padding: 0;
+    }
+    
+    /* Sidebar */
+    .sidebar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      bottom: 0;
+      width: var(--sidebar-width);
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      overflow-y: auto;
+      z-index: 1000;
+      box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+    }
+    
+    .sidebar-header {
+      padding: 1.5rem;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+    
+    .sidebar-brand {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: white;
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    
+    .sidebar-nav {
+      padding: 1rem 0;
+    }
+    
+    .sidebar-nav-item {
+      padding: 0.75rem 1.5rem;
+      color: rgba(255,255,255,0.8);
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      transition: all 0.2s;
+      cursor: pointer;
+    }
+    
+    .sidebar-nav-item:hover,
+    .sidebar-nav-item.active {
+      background: rgba(255,255,255,0.15);
+      color: white;
+    }
+    
+    .sidebar-section-title {
+      padding: 1.5rem 1.5rem 0.5rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: rgba(255,255,255,0.6);
+    }
+    
+    /* Main Content */
+    .main-content {
+      margin-left: var(--sidebar-width);
+      min-height: 100vh;
+    }
+    
+    .navbar {
+      background: white;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      padding: 1rem 2rem;
+    }
+    
+    .page-header {
+      padding: 2rem;
+      background: white;
+      margin: 1.5rem;
+      border-radius: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    
+    .card {
+      border: none;
+      border-radius: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      margin-bottom: 1.5rem;
+    }
+    
+    .card-header {
+      background: white;
+      border-bottom: 1px solid #e5e7eb;
+      padding: 1.25rem 1.5rem;
+      font-weight: 600;
+      color: #1f2937;
+    }
+    
+    #map {
+      height: 500px;
+      width: 100%;
+      border-radius: 8px;
+    }
+    
+    .item-row {
+      display: flex;
+      align-items: center;
+      padding: 1rem;
+      border-bottom: 1px solid #e5e7eb;
+      transition: background 0.2s;
+    }
+    
+    .item-row:hover {
+      background: #f9fafb;
+    }
+    
+    .item-badge {
+      background: var(--primary-color);
+      color: white;
+      padding: 0.25rem 0.75rem;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 0.875rem;
+      margin-right: 1rem;
+    }
+    
+    .item-info {
+      flex: 1;
+    }
+    
+    .item-name {
+      font-weight: 600;
+      color: #1f2937;
+      margin-bottom: 0.25rem;
+    }
+    
+    .item-meta {
+      font-size: 0.875rem;
+      color: #6b7280;
+    }
+    
+    .btn-primary {
+      background: var(--primary-color);
+      border-color: var(--primary-color);
+    }
+    
+    .btn-primary:hover {
+      background: #4338ca;
+      border-color: #4338ca;
+    }
+    
+    .btn-success {
+      background: var(--secondary-color);
+      border-color: var(--secondary-color);
+    }
+    
+    .btn-success:hover {
+      background: #059669;
+      border-color: #059669;
+    }
+    
+    .items-list {
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    
+    .add-form {
+      background: #f9fafb;
+      padding: 1.5rem;
+      border-radius: 8px;
+      margin: 1rem 0;
+    }
+    
+    .tab-pane {
+      display: none;
+    }
+    
+    .tab-pane.active {
+      display: block;
+    }
+    
+    .badge-gidis {
+      background: #3b82f6 !important;
+    }
+    
+    .badge-donus {
+      background: #f59e0b !important;
+    }
+    
+    /* Responsive */
+    @media (max-width: 768px) {
+      .sidebar {
+        transform: translateX(-100%);
+      }
+      .main-content {
+        margin-left: 0;
+      }
+    }
+  </style>
 </head>
 <body>
-  <div class="container">
-    <header>
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-        <h1>🚏 Stop Station</h1>
-        <a href="/dashboard.html" style="background: #10B981; color: white; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-weight: 500; font-size: 14px;">📊 Saha Kontrol Paneli</a>
-      </div>
-      <p>GPS verisinden otobüs durağı tespiti</p>
-    </header>
-
-    <!-- HAT YÖNETİMİ - YENİ BÖLÜM -->
-    <div class="card">
-      <h2>🚌 Hat ve Durak Yönetimi</h2>
+  
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <a href="/" class="sidebar-brand">
+        <span>🚏</span>
+        <span>Stop Station</span>
+      </a>
+    </div>
+    
+    <nav class="sidebar-nav">
+      <a href="/" class="sidebar-nav-item active">
+        <span>📍</span>
+        <span>GPS Durak Tespiti</span>
+      </a>
+      <a href="#" class="sidebar-nav-item" onclick="switchTab('field-control-tab'); return false;">
+        <span>📊</span>
+        <span>Saha Kontrol Paneli</span>
+      </a>
       
-      <div class="tabs">
-        <button class="tab-btn active" data-tab="routes-tab">Hatlar</button>
-        <button class="tab-btn" data-tab="stops-tab">Duraklar</button>
-      </div>
-
-      <div id="routes-tab" class="tab-content active">
-        <div class="management-header">
-          <input type="text" id="routeSearch" placeholder="Hat ara..." class="search-input">
-          <button id="btnRefreshRoutes" class="btn-icon" title="Yenile">🔄</button>
-        </div>
-        
-        <div id="routesList" class="items-list">
-          <p class="loading-text">Hatlar yükleniyor...</p>
-        </div>
-        
-        <div class="add-form" id="addRouteForm" style="display: none;">
-          <h4>➕ Yeni Hat Ekle</h4>
-          <input type="text" id="newRouteNumber" placeholder="Hat No (örn: 103)">
-          <input type="text" id="newRouteName" placeholder="Hat Adı (örn: Konak - Karşıyaka)">
-          <div class="form-buttons">
-            <button id="btnSaveRoute" class="btn-primary btn-sm">💾 Kaydet</button>
-            <button id="btnCancelRoute" class="btn-secondary btn-sm">İptal</button>
-          </div>
-        </div>
-        
-        <button id="btnAddRoute" class="btn-success btn-block">➕ Yeni Hat Ekle</button>
-      </div>
-
-      <div id="stops-tab" class="tab-content">
-        <div class="management-header">
-          <select id="stopRouteFilter" class="select-input">
-            <option value="">Tüm Hatlar</option>
-          </select>
-          <select id="stopDirectionFilter" class="select-input">
-            <option value="">Tüm Yönler</option>
-            <option value="gidis">Gidiş</option>
-            <option value="donus">Dönüş</option>
-          </select>
-        </div>
-        
-        <div id="stopsList" class="items-list">
-          <p class="loading-text">Duraklar yükleniyor...</p>
-        </div>
-        
-        <div class="add-form" id="addStopForm" style="display: none;">
-          <h4>➕ Yeni Durak Ekle</h4>
-          <select id="newStopRoute" class="select-input">
-            <option value="">Hat Seç</option>
-          </select>
-          <select id="newStopDirection" class="select-input">
-            <option value="gidis">Gidiş</option>
-            <option value="donus">Dönüş</option>
-          </select>
-          <input type="text" id="newStopName" placeholder="Durak Adı">
-          <input type="number" id="newStopLat" placeholder="Enlem" step="0.000001">
-          <input type="number" id="newStopLon" placeholder="Boylam" step="0.000001">
-          <div class="form-buttons">
-            <button id="btnSaveStop" class="btn-primary btn-sm">💾 Kaydet</button>
-            <button id="btnCancelStop" class="btn-secondary btn-sm">İptal</button>
-          </div>
-        </div>
-        
-        <button id="btnAddStop" class="btn-success btn-block">➕ Yeni Durak Ekle</button>
-      </div>
-    </div>
-
-    <div class="card">
-      <h2>📂 Veri Yükleme</h2>
-      <div class="form-group">
-        <label>GPS CSV Dosyası</label>
-        <input type="file" id="csvFile" accept=".csv">
-        <small>Sütunlar: SeferId, Plaka, lineId, routeId, Enlem, Boylam, KonumZamani, Hiz</small>
-      </div>
-
-      <div class="form-group">
-        <label>Durak JSON</label>
-        <input type="file" id="stopsFile" accept=".json">
-        <small>direction/yon property ile gidiş/dönüş bilgisi olmalı</small>
-      </div>
-
-      <div class="form-group">
-        <label>Yön Filtresi</label>
-        <select id="directionFilter">
-          <option value="all">Tümü</option>
-          <option value="gidis">Sadece Gidiş</option>
-          <option value="donus">Sadece Dönüş</option>
-        </select>
-        <small><strong>⚠️ Önemli:</strong> GPS verisi tek yön içeriyorsa (örn. sadece gidiş), pipeline çalıştırmadan önce o yönü seçin!</small>
-      </div>
-
-      <div class="button-group">
-        <button id="btnPipeline" class="btn-primary" disabled>
-          <span class="btn-text">🔄 Pipeline Çalıştır</span>
-          <span class="loader" style="display:none;">⏳ Yükleniyor...</span>
-        </button>
-        <button id="btnSavePipeline" class="btn-success" disabled style="display:none;">
-          💾 Sonucu Kaydet
-        </button>
-        <button id="btnClear" class="btn-secondary">🗑️ Temizle</button>
-      </div>
-
-      <!-- Hat ve Yön Seçimi (kaydetme için) -->
-      <div id="saveRoutePanel" class="form-group" style="display:none; margin-top: 16px; padding: 16px; background: #f0fdf4; border-radius: 8px; border: 2px solid #10B981;">
-        <h4 style="margin: 0 0 12px 0; color: #10B981;">💾 Pipeline Sonucunu Kaydet</h4>
-        <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
-          <select id="saveRouteSelect" class="select-input" style="flex: 1; min-width: 200px;">
-            <option value="">Hat Seç...</option>
-          </select>
-          <select id="saveDirectionSelect" class="select-input" style="width: 120px;">
-            <option value="gidis">Gidiş</option>
-            <option value="donus">Dönüş</option>
-          </select>
-          <button id="btnConfirmSave" class="btn-success">💾 Kaydet</button>
-        </div>
-        <small style="display: block; margin-top: 8px; color: #6B7280;">Tespit edilen rota ve duraklar seçilen hatta kaydedilecek.</small>
-      </div>
-    </div>
-
-    <div class="card">
-      <h2>🗺️ Harita</h2>
-      <div id="map"></div>
-        <button id="btnDownloadStops" class="btn-secondary" style="margin-top: 16px;">⬇️ Tespit Edilen Durakları İndir (CSV)</button>
-    </div>
-
-    <div class="card" id="comparisonCard" style="display: none;">
-      <h2>🔍 Gerçek Duraklar vs Tespit Edilen Duraklar</h2>
-      <div id="comparisonResults"></div>
-    </div>
-
-    <div class="card">
-      <h2>📋 Log</h2>
-      <pre id="output">Hazır. CSV ve durak JSON yükleyin.</pre>
-    </div>
+      <div class="sidebar-section-title">Yönetim</div>
+      
+      <a href="#" class="sidebar-nav-item" onclick="switchTab('routes-tab'); return false;">
+        <span>🚌</span>
+        <span>Hatlar</span>
+      </a>
+      <a href="#" class="sidebar-nav-item" onclick="switchTab('stops-tab'); return false;">
+        <span>🛑</span>
+        <span>Duraklar</span>
+      </a>
+      <a href="#" class="sidebar-nav-item" onclick="switchTab('analytics-tab'); return false;">
+        <span>📊</span>
+        <span>Analitik</span>
+      </a>
+      <a href="#" class="sidebar-nav-item" onclick="switchTab('import-export-tab'); return false;">
+        <span>💾</span>
+        <span>Import/Export</span>
+      </a>
+    </nav>
   </div>
+  
+  <!-- Main Content -->
+  <div class="main-content">
+    
+    <!-- Navbar -->
+    <nav class="navbar">
+      <div class="container-fluid">
+        <span class="text-muted" id="navBreadcrumb">Ana Sayfa / GPS Durak Tespiti</span>
+      </div>
+    </nav>
+    
+    <!-- Page Header -->
+    <div class="page-header" id="pageHeader">
+      <h3 class="mb-1 fw-bold" id="pageTitle">GPS Durak Tespiti</h3>
+      <p class="text-muted mb-0" id="pageDescription">GPS verisinden otomatik durak tespiti ve rota analizi</p>
+    </div>
+    
+    <!-- Content -->
+    <div class="container-fluid px-4">
+      
+      <!-- Saha Kontrol Paneli -->
+      <div id="field-control-panel" style="display: none;">
+        <!-- Filtre Paneli -->
+        <div class="card mb-3">
+          <div class="card-header">
+            🔍 Filtreler
+          </div>
+          <div class="card-body">
+            <div class="row g-3">
+              <div class="col-md-3">
+                <label class="form-label">Hat</label>
+                <select id="fieldRouteFilter" class="form-select">
+                  <option value="">Tüm Hatlar</option>
+                </select>
+              </div>
+              <div class="col-md-2">
+                <label class="form-label">Yön</label>
+                <select id="fieldDirectionFilter" class="form-select">
+                  <option value="">Tümü</option>
+                  <option value="gidis">Gidiş</option>
+                  <option value="donus">Dönüş</option>
+                </select>
+              </div>
+              <div class="col-md-2">
+                <label class="form-label">İşlem</label>
+                <select id="fieldActionFilter" class="form-select">
+                  <option value="">Tümü</option>
+                  <option value="APPROVE">Onaylanan</option>
+                  <option value="REJECT">Reddedilen</option>
+                  <option value="ADD">Eklenen</option>
+                </select>
+              </div>
+              <div class="col-md-5 d-flex align-items-end gap-2">
+                <button id="fieldRefreshBtn" class="btn btn-primary">🗺️ Haritada Göster</button>
+                <button id="fieldDownloadBtn" class="btn btn-success">📥 CSV İndir</button>
+              </div>
+            </div>
+          </div>
+        </div>
 
+        <!-- İstatistikler -->
+        <div class="row mb-3">
+          <div class="col-md-2">
+            <div class="card bg-primary text-white">
+              <div class="card-body text-center">
+                <h3 id="fieldStatStops">0</h3>
+                <p class="mb-0">Durak</p>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-2">
+            <div class="card bg-success text-white">
+              <div class="card-body text-center">
+                <h3 id="fieldStatApprove">0</h3>
+                <p class="mb-0">Onaylanan</p>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-2">
+            <div class="card bg-danger text-white">
+              <div class="card-body text-center">
+                <h3 id="fieldStatReject">0</h3>
+                <p class="mb-0">Reddedilen</p>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-2">
+            <div class="card bg-info text-white">
+              <div class="card-body text-center">
+                <h3 id="fieldStatAdd">0</h3>
+                <p class="mb-0">Eklenen</p>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="card bg-dark text-white">
+              <div class="card-body text-center">
+                <h3 id="fieldStatTotal">0</h3>
+                <p class="mb-0">Toplam İşlem</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Son İşlemler -->
+        <div class="card mb-3">
+          <div class="card-header">
+            📝 Son İşlemler
+          </div>
+          <div class="card-body">
+            <div id="fieldActionsList" style="max-height: 400px; overflow-y: auto;">
+              <p class="text-center text-muted py-5">Yükleniyor...</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Harita -->
+        <div class="card">
+          <div class="card-header">
+            🗺️ Harita Görünümü
+          </div>
+          <div class="card-body">
+            <div id="fieldMap" style="height: 500px; border-radius: 8px;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- GPS Durak Tespiti Paneli -->
+      <div id="gps-detection-panel">
+      
+      <!-- Hat ve Durak Yönetimi -->
+      <div class="card">
+        <div class="card-header">
+          🚌 Hat ve Durak Yönetimi
+        </div>
+        <div class="card-body">
+          
+          <!-- Tabs -->
+          <ul class="nav nav-tabs mb-3" role="tablist">
+            <li class="nav-item" role="presentation">
+              <button class="nav-link active" id="routes-tab-btn" onclick="switchTab('routes-tab')">Hatlar</button>
+            </li>
+            <li class="nav-item" role="presentation">
+              <button class="nav-link" id="stops-tab-btn" onclick="switchTab('stops-tab')">Duraklar</button>
+            </li>
+            <li class="nav-item" role="presentation">
+              <button class="nav-link" id="analytics-tab-btn" onclick="switchTab('analytics-tab')">Analitik</button>
+            </li>
+            <li class="nav-item" role="presentation">
+              <button class="nav-link" id="import-export-tab-btn" onclick="switchTab('import-export-tab')">Import/Export</button>
+            </li>
+          </ul>
+
+          <div class="tabs-container">
+            <!-- Hatlar Tab -->
+            <div class="tab-pane active" id="routes-tab">
+              <div class="d-flex gap-2 mb-3">
+                <input type="text" id="routeSearch" placeholder="Hat ara..." class="form-control" style="max-width: 300px;">
+                <button id="btnRefreshRoutes" class="btn btn-outline-secondary" title="Yenile">🔄</button>
+              </div>
+              
+              <div id="routesList" class="items-list">
+                <p class="text-center text-muted py-5">Hatlar yükleniyor...</p>
+              </div>
+              
+              <div class="add-form" id="addRouteForm" style="display: none;">
+                <h6 class="mb-3">➕ Yeni Hat Ekle</h6>
+                <input type="text" id="newRouteNumber" placeholder="Hat No (örn: 103)" class="form-control mb-2">
+                <input type="text" id="newRouteName" placeholder="Hat Adı (örn: Konak - Karşıyaka)" class="form-control mb-3">
+                <div class="d-flex gap-2">
+                  <button id="btnSaveRoute" class="btn btn-primary btn-sm">💾 Kaydet</button>
+                  <button id="btnCancelRoute" class="btn btn-secondary btn-sm">İptal</button>
+                </div>
+              </div>
+              
+              <button id="btnAddRoute" class="btn btn-success w-100 mt-3">➕ Yeni Hat Ekle</button>
+            </div>
+
+            <!-- Duraklar Tab -->
+            <div class="tab-pane" id="stops-tab">
+              <div class="d-flex gap-2 mb-3">
+                <select id="stopRouteFilter" class="form-select" style="max-width: 200px;">
+                  <option value="">Tüm Hatlar</option>
+                </select>
+                <select id="stopDirectionFilter" class="form-select" style="max-width: 150px;">
+                  <option value="">Tüm Yönler</option>
+                  <option value="gidis">Gidiş</option>
+                  <option value="donus">Dönüş</option>
+                </select>
+              </div>
+              
+              <div id="stopsList" class="items-list">
+                <p class="text-center text-muted py-5">Duraklar yükleniyor...</p>
+              </div>
+              
+              <div class="add-form" id="addStopForm" style="display: none;">
+                <h6 class="mb-3">➕ Yeni Durak Ekle</h6>
+                <select id="newStopRoute" class="form-select mb-2">
+                  <option value="">Hat Seç</option>
+                </select>
+                <select id="newStopDirection" class="form-select mb-2">
+                  <option value="gidis">Gidiş</option>
+                  <option value="donus">Dönüş</option>
+                </select>
+                <input type="text" id="newStopName" placeholder="Durak Adı" class="form-control mb-2">
+                <input type="number" id="newStopLat" placeholder="Enlem" step="0.000001" class="form-control mb-2">
+                <input type="number" id="newStopLon" placeholder="Boylam" step="0.000001" class="form-control mb-3">
+                <div class="d-flex gap-2">
+                  <button id="btnSaveStop" class="btn btn-primary btn-sm">💾 Kaydet</button>
+                  <button id="btnCancelStop" class="btn btn-secondary btn-sm">İptal</button>
+                </div>
+              </div>
+              
+              <button id="btnAddStop" class="btn btn-success w-100 mt-3">➕ Yeni Durak Ekle</button>
+            </div>
+
+            <!-- Analytics Tab -->
+            <div class="tab-pane" id="analytics-tab">
+              <div id="analyticsLoading" class="text-center py-5">
+                <p class="text-muted">Yükleniyor...</p>
+              </div>
+              
+              <div id="analyticsSummary" style="display:none;">
+                <div class="row mb-4">
+                  <div class="col-md-3">
+                    <div class="card bg-primary text-white">
+                      <div class="card-body">
+                        <h4 id="totalRoutesCount">0</h4>
+                        <p class="mb-0">Toplam Hat</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="col-md-3">
+                    <div class="card bg-success text-white">
+                      <div class="card-body">
+                        <h4 id="totalStopsCount">0</h4>
+                        <p class="mb-0">Toplam Durak</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="col-md-3">
+                    <div class="card bg-info text-white">
+                      <div class="card-body">
+                        <h4 id="routesWithPolylineCount">0</h4>
+                        <p class="mb-0">GPS Verili Hat</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="col-md-3">
+                    <div class="card bg-warning text-white">
+                      <div class="card-body">
+                        <h4 id="routesWithoutPolylineCount">0</h4>
+                        <p class="mb-0">GPS Verisiz Hat</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <h6 class="mb-3">Hat Detayları</h6>
+                <div class="table-responsive">
+                  <table class="table table-hover">
+                    <thead>
+                      <tr>
+                        <th>Hat No</th>
+                        <th>Hat Adı</th>
+                        <th>Gidiş Durak</th>
+                        <th>Dönüş Durak</th>
+                        <th>Toplam</th>
+                        <th>Gidiş Uzunluk</th>
+                        <th>Dönüş Uzunluk</th>
+                      </tr>
+                    </thead>
+                    <tbody id="analyticsTableBody">
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <!-- Import/Export Tab -->
+            <div class="tab-pane" id="import-export-tab">
+              <div class="alert alert-info">
+                <strong>ℹ️ Bilgi:</strong> Tüm hat ve durak verilerinizi JSON formatında dışa aktarabilir veya içe aktarabilirsiniz.
+              </div>
+              
+              <div class="mb-4">
+                <h6 class="mb-3">📤 Export (Dışa Aktar)</h6>
+                <button id="btnExportAll" class="btn btn-primary">
+                  ⬇️ Tüm Verileri İndir (JSON)
+                </button>
+                <small class="d-block mt-2 text-muted">Tüm hatlar ve duraklar JSON dosyası olarak indirilecek</small>
+              </div>
+              
+              <hr>
+              
+              <div class="mb-4">
+                <h6 class="mb-3">📥 Import (İçe Aktar)</h6>
+                <input type="file" id="importFile" accept=".json" class="form-control mb-2">
+                <div class="form-check mb-3">
+                  <input class="form-check-input" type="checkbox" id="overwriteData">
+                  <label class="form-check-label" for="overwriteData">
+                    <strong>⚠️ Mevcut verileri sil ve üzerine yaz</strong>
+                  </label>
+                  <small class="d-block text-muted">İşaretlenirse mevcut tüm veriler silinir ve dosyadaki veriler yazılır</small>
+                </div>
+                <button id="btnImportAll" class="btn btn-success" disabled>
+                  ⬆️ Verileri İçe Aktar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Veri Yükleme -->
+      <div class="card">
+        <div class="card-header">
+          📂 Veri Yükleme
+        </div>
+        <div class="card-body">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">GPS CSV Dosyası</label>
+            <input type="file" id="csvFile" accept=".csv" class="form-control">
+            <small class="text-muted">Sütunlar: SeferId, Plaka, lineId, routeId, Enlem, Boylam, KonumZamani, Hiz</small>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Durak JSON (Opsiyonel)</label>
+            <input type="file" id="stopsFile" accept=".json" class="form-control">
+            <small class="text-muted">direction/yon property ile gidiş/dönüş bilgisi olmalı</small>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Yön Filtresi</label>
+            <select id="directionFilter" class="form-select">
+              <option value="all">Tümü</option>
+              <option value="gidis">Sadece Gidiş</option>
+              <option value="donus">Sadece Dönüş</option>
+            </select>
+            <small class="text-muted"><strong>⚠️ Önemli:</strong> GPS verisi tek yön içeriyorsa (örn. sadece gidiş), pipeline çalıştırmadan önce o yönü seçin!</small>
+          </div>
+
+          <div class="d-flex gap-2 flex-wrap mb-3">
+            <button id="btnPipeline" class="btn btn-primary" disabled>
+              <span class="btn-text">🔄 Pipeline Çalıştır</span>
+              <span class="loader" style="display:none;">⏳ Yükleniyor...</span>
+            </button>
+            <button id="btnSavePipeline" class="btn btn-success" disabled style="display:none;">
+              💾 Sonucu Kaydet
+            </button>
+            <button id="btnClear" class="btn btn-secondary">🗑️ Temizle</button>
+          </div>
+
+          <!-- Kaydetme Paneli -->
+          <div id="saveRoutePanel" class="p-3" style="display:none; background: #f0fdf4; border-radius: 8px; border: 2px solid #10B981;">
+            <h6 class="text-success mb-3">💾 Pipeline Sonucunu Kaydet</h6>
+            
+            <!-- Tespit Edilen Durakları Önizle ve Düzenle -->
+            <div id="detectedStopsPreview" class="mb-3" style="display:none;">
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <strong>🚏 Tespit Edilen Duraklar (<span id="detectedStopsCount">0</span>)</strong>
+                <button class="btn btn-sm btn-outline-secondary" onclick="toggleStopsPreview()">👁️ Göster/Gizle</button>
+              </div>
+              <div id="stopsPreviewList" style="display:none; max-height: 300px; overflow-y: auto; background: white; border: 1px solid #e5e7eb; border-radius: 6px; padding: 0.5rem;">
+                <!-- Duraklar buraya yüklenecek -->
+              </div>
+            </div>
+            
+            <div class="d-flex gap-2 flex-wrap align-items-center">
+              <select id="saveRouteSelect" class="form-select" style="flex: 1; min-width: 200px;">
+                <option value="">Hat Seç...</option>
+              </select>
+              <select id="saveDirectionSelect" class="form-select" style="width: 120px;">
+                <option value="gidis">Gidiş</option>
+                <option value="donus">Dönüş</option>
+              </select>
+              <button id="btnConfirmSave" class="btn btn-success">💾 Kaydet</button>
+            </div>
+            <small class="d-block mt-2 text-muted">Tespit edilen rota ve duraklar seçilen hatta kaydedilecek.</small>
+          </div>
+        </div>
+      </div>
+
+      <!-- Harita -->
+      <div class="card">
+        <div class="card-header">
+          🗺️ Harita
+        </div>
+        <div class="card-body">
+          <div id="map"></div>
+          <button id="btnDownloadStops" class="btn btn-secondary mt-3">⬇️ Tespit Edilen Durakları İndir (CSV)</button>
+        </div>
+      </div>
+
+      <!-- Karşılaştırma -->
+      <div class="card" id="comparisonCard" style="display: none;">
+        <div class="card-header">
+          🔍 Gerçek Duraklar vs Tespit Edilen Duraklar
+        </div>
+        <div class="card-body">
+          <div id="comparisonResults"></div>
+        </div>
+      </div>
+
+      <!-- Log -->
+      <div class="card">
+        <div class="card-header">
+          📋 Log
+        </div>
+        <div class="card-body">
+          <pre id="output" style="background: #f9fafb; padding: 1rem; border-radius: 8px; max-height: 300px; overflow-y: auto; font-size: 0.875rem;">Hazır. CSV ve durak JSON yükleyin.</pre>
+        </div>
+      </div>
+
+      </div><!-- GPS Detection Panel Kapanış -->
+
+    </div><!-- Container kapanış -->
+  </div><!-- Main Content kapanış -->
+
+  <!-- Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script type="module" src="/js/app.js"></script>
+  
+  <script>
+    // Tab switching helper
+    function switchTab(tabId) {
+      console.log('Switching to tab:', tabId);
+      
+      // Saha Kontrol Paneli özel durumu
+      if (tabId === 'field-control-tab') {
+        // GPS panel'i gizle, Field panel göster
+        document.getElementById('gps-detection-panel').style.display = 'none';
+        document.getElementById('field-control-panel').style.display = 'block';
+        
+        // Başlık güncelle
+        document.getElementById('navBreadcrumb').textContent = 'Ana Sayfa / Saha Kontrol Paneli';
+        document.getElementById('pageTitle').textContent = 'Saha Kontrol Paneli';
+        document.getElementById('pageDescription').textContent = 'Sahadan gelen durak doğrulama verileri';
+        
+        // Sidebar aktif öğeyi güncelle
+        document.querySelectorAll('.sidebar-nav-item').forEach(item => item.classList.remove('active'));
+        document.querySelectorAll('.sidebar-nav-item')[1].classList.add('active');
+        
+        // Saha kontrol verilerini yükle
+        if (window.loadFieldData) window.loadFieldData();
+        return;
+      }
+      
+      // GPS Durak Tespiti tab'larına dönüş
+      document.getElementById('gps-detection-panel').style.display = 'block';
+      document.getElementById('field-control-panel').style.display = 'none';
+      document.getElementById('navBreadcrumb').textContent = 'Ana Sayfa / GPS Durak Tespiti';
+      document.getElementById('pageTitle').textContent = 'GPS Durak Tespiti';
+      document.getElementById('pageDescription').textContent = 'GPS verisinden otomatik durak tespiti ve rota analizi';
+      
+      // Sidebar aktif öğeyi güncelle
+      document.querySelectorAll('.sidebar-nav-item').forEach(item => item.classList.remove('active'));
+      document.querySelectorAll('.sidebar-nav-item')[0].classList.add('active');
+      
+      // Update tab buttons
+      document.querySelectorAll('.nav-link').forEach(btn => btn.classList.remove('active'));
+      if (tabId === 'routes-tab') {
+        document.getElementById('routes-tab-btn').classList.add('active');
+      } else if (tabId === 'stops-tab') {
+        document.getElementById('stops-tab-btn').classList.add('active');
+      } else if (tabId === 'analytics-tab') {
+        document.getElementById('analytics-tab-btn').classList.add('active');
+        // Analytics tab açıldığında verileri yükle
+        if (window.loadAnalytics) window.loadAnalytics();
+      } else if (tabId === 'import-export-tab') {
+        document.getElementById('import-export-tab-btn').classList.add('active');
+      }
+      
+      // Update tab content
+      document.querySelectorAll('.tab-pane').forEach(tab => tab.classList.remove('active'));
+      document.getElementById(tabId).classList.add('active');
+    }
+  </script>
 </body>
 </html>

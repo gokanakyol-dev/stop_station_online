@@ -775,25 +775,36 @@ async function loadRoutes() {
 function renderRoutes(routes) {
   const routesList = document.getElementById('routesList');
   console.log('renderRoutes çağrıldı, routes:', routes.length);
+  console.log('routesList elementi:', routesList);
   
-  if (routes.length === 0) {
-    routesList.innerHTML = '<p class="no-data">Hat bulunamadı</p>';
+  if (!routesList) {
+    console.error('❌ routesList elementi bulunamadı!');
     return;
   }
   
-  routesList.innerHTML = routes.map(r => `
+  if (routes.length === 0) {
+    routesList.innerHTML = '<p class="no-data">Hat bulunamadı</p>';
+    console.log('Hatlar boş, "Hat bulunamadı" mesajı gösteriliyor');
+    return;
+  }
+  
+  const html = routes.map(r => `
     <div class="item-row" data-id="${r.id}">
       <span class="item-badge">${r.route_number}</span>
       <div class="item-info">
         <div class="item-name">${r.route_name}</div>
         <div class="item-meta">ID: ${r.id}</div>
       </div>
-      <div class="item-actions">
-        <button class="btn-danger btn-sm" onclick="deleteRoute(${r.id})">🗑️</button>
+      <div class="item-actions" style="display: flex; gap: 0.5rem;">
+        <button class="btn btn-primary btn-sm" onclick="editRoute(${r.id}, '${r.route_number}', '${r.route_name}')">✏️</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteRoute(${r.id})">🗑️</button>
       </div>
     </div>
   `).join('');
-  console.log('Hatlar DOM\'a eklendi');
+  
+  routesList.innerHTML = html;
+  console.log('✅ Hatlar DOM\'a eklendi, HTML uzunluğu:', html.length);
+  console.log('routesList.innerHTML:', routesList.innerHTML.substring(0, 200));
 }
 
 function updateRouteSelects() {
@@ -864,6 +875,27 @@ document.getElementById('btnSaveRoute')?.addEventListener('click', async () => {
   }
 });
 
+// Hat düzenleme
+window.editRoute = function(id, number, name) {
+  const newNumber = prompt('Yeni Hat Numarası:', number);
+  if (!newNumber) return;
+  
+  const newName = prompt('Yeni Hat Adı:', name);
+  if (!newName) return;
+  
+  fetch(`${API_BASE}/api/routes/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ route_number: newNumber, route_name: newName })
+  })
+  .then(res => {
+    if (!res.ok) throw new Error('Hat güncellenemedi');
+    loadRoutes();
+    log(`✅ Hat güncellendi: ${newNumber} - ${newName}`);
+  })
+  .catch(err => alert('Hata: ' + err.message));
+};
+
 // Hat silme
 window.deleteRoute = async function(id) {
   if (!confirm('Bu hattı silmek istediğinize emin misiniz? Tüm durakları da silinecek!')) return;
@@ -924,8 +956,9 @@ function renderStops(stopsData) {
           <div class="item-name">${s.name}</div>
           <div class="item-meta">${s.lat?.toFixed(6)}, ${s.lon?.toFixed(6)}</div>
         </div>
-        <div class="item-actions">
-          <button class="btn-danger btn-sm" onclick="deleteStop(${s.id})">🗑️</button>
+        <div class="item-actions" style="display: flex; gap: 0.5rem;">
+          <button class="btn btn-primary btn-sm" onclick='editStop(${s.id}, "${s.name.replace(/'/g, "\\'")}",${s.lat},${s.lon})'>✏️</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteStop(${s.id})">🗑️</button>
         </div>
       </div>
     `;
@@ -983,6 +1016,30 @@ document.getElementById('btnSaveStop')?.addEventListener('click', async () => {
   }
 });
 
+// Durak düzenleme
+window.editStop = function(id, name, lat, lon) {
+  const newName = prompt('Yeni Durak Adı:', name);
+  if (!newName) return;
+  
+  const newLat = parseFloat(prompt('Yeni Enlem:', lat));
+  if (isNaN(newLat)) return;
+  
+  const newLon = parseFloat(prompt('Yeni Boylam:', lon));
+  if (isNaN(newLon)) return;
+  
+  fetch(`${API_BASE}/api/stops/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: newName, lat: newLat, lon: newLon })
+  })
+  .then(res => {
+    if (!res.ok) throw new Error('Durak güncellenemedi');
+    loadStops();
+    log(`✅ Durak güncellendi: ${newName}`);
+  })
+  .catch(err => alert('Hata: ' + err.message));
+};
+
 // Durak silme
 window.deleteStop = async function(id) {
   if (!confirm('Bu durağı silmek istediğinize emin misiniz?')) return;
@@ -1034,8 +1091,51 @@ function showSavePanel() {
   if (saveRoutePanel) {
     saveRoutePanel.style.display = 'block';
     loadRoutesForSave();
+    
+    // Tespit edilen durakları önizle
+    const autoDetected = pipelineResult?.autoStops?.detectedStops || [];
+    if (autoDetected.length > 0) {
+      const preview = document.getElementById('detectedStopsPreview');
+      const count = document.getElementById('detectedStopsCount');
+      const list = document.getElementById('stopsPreviewList');
+      
+      preview.style.display = 'block';
+      count.textContent = autoDetected.length;
+      
+      list.innerHTML = autoDetected.map((stop, idx) => `
+        <div class="d-flex align-items-center p-2 border-bottom" data-stop-index="${idx}">
+          <input type="checkbox" class="form-check-input me-2" id="stop-${idx}" checked>
+          <div class="flex-grow-1">
+            <label for="stop-${idx}" class="form-check-label" style="cursor: pointer;">
+              <strong>#${stop.sequenceNumber || idx + 1}</strong> - ${stop.name || 'Durak ' + (idx + 1)}
+            </label>
+            <small class="d-block text-muted">${stop.lat.toFixed(6)}, ${stop.lon.toFixed(6)} - ${((stop.distanceAlongRoute || 0) / 1000).toFixed(2)} km</small>
+          </div>
+          <button class="btn btn-sm btn-outline-primary" onclick="editDetectedStop(${idx})">✏️</button>
+        </div>
+      `).join('');
+    }
   }
 }
+
+// Durak önizleme toggle
+window.toggleStopsPreview = function() {
+  const list = document.getElementById('stopsPreviewList');
+  list.style.display = list.style.display === 'none' ? 'block' : 'none';
+};
+
+// Tespit edilen durağı düzenle
+window.editDetectedStop = function(index) {
+  const autoDetected = pipelineResult?.autoStops?.detectedStops || [];
+  if (index >= autoDetected.length) return;
+  
+  const stop = autoDetected[index];
+  const newName = prompt('Durak Adı:', stop.name || 'Durak ' + (index + 1));
+  if (newName) {
+    stop.name = newName;
+    showSavePanel(); // Refresh
+  }
+};
 
 // Pipeline sonucunu kaydet
 async function savePipelineResult() {
@@ -1052,7 +1152,22 @@ async function savePipelineResult() {
     return;
   }
   
-  const autoDetected = pipelineResult.autoStops?.detectedStops || [];
+  const allStops = pipelineResult.autoStops?.detectedStops || [];
+  
+  // Sadece seçili durakları al
+  const selectedStops = [];
+  allStops.forEach((stop, idx) => {
+    const checkbox = document.getElementById(`stop-${idx}`);
+    if (checkbox && checkbox.checked) {
+      selectedStops.push(stop);
+    }
+  });
+  
+  if (selectedStops.length === 0) {
+    alert('En az bir durak seçmelisiniz');
+    return;
+  }
+  
   const skeleton = pipelineResult.route?.skeleton || [];
   const totalLength = pipelineResult.pipeline?.step1E?.totalDistanceKm * 1000 || 0;
   
@@ -1070,7 +1185,7 @@ async function savePipelineResult() {
         polyline: polyline,
         skeleton: skeleton,
         total_length: totalLength,
-        stops: autoDetected
+        stops: selectedStops
       })
     });
     
@@ -1103,10 +1218,342 @@ async function savePipelineResult() {
 btnConfirmSave?.addEventListener('click', savePipelineResult);
 
 // Sayfa yüklenince verileri çek
+console.log('🚀 Sayfa yüklendi, hatlar ve duraklar çekiliyor...');
 loadRoutes();
 loadStops();
+
+// Debug için global erişim
+window.debugStopStation = {
+  loadRoutes,
+  loadStops,
+  allRoutes: () => allRoutes,
+  allStops: () => allStops
+};
+
+// =============================================
+// ANALYTICS FONKSİYONLARI
+// =============================================
+
+window.loadAnalytics = async function() {
+  const loading = document.getElementById('analyticsLoading');
+  const summary = document.getElementById('analyticsSummary');
+  
+  try {
+    loading.style.display = 'block';
+    summary.style.display = 'none';
+    
+    // Summary verilerini al
+    const summaryRes = await fetch(`${API_BASE}/api/analytics/summary`);
+    const summaryData = await summaryRes.json();
+    
+    document.getElementById('totalRoutesCount').textContent = summaryData.totalRoutes;
+    document.getElementById('totalStopsCount').textContent = summaryData.totalStops;
+    document.getElementById('routesWithPolylineCount').textContent = summaryData.routesWithPolyline;
+    document.getElementById('routesWithoutPolylineCount').textContent = summaryData.routesWithoutPolyline;
+    
+    // Detaylı istatistikleri al
+    const statsRes = await fetch(`${API_BASE}/api/analytics/routes`);
+    const statsData = await statsRes.json();
+    
+    const tableBody = document.getElementById('analyticsTableBody');
+    tableBody.innerHTML = statsData.stats.map(s => `
+      <tr>
+        <td><strong>${s.route_number}</strong></td>
+        <td>${s.route_name}</td>
+        <td>${s.gidisStops}</td>
+        <td>${s.donusStops}</td>
+        <td><strong>${s.totalStops}</strong></td>
+        <td>${s.gidisLength > 0 ? (s.gidisLength / 1000).toFixed(2) + ' km' : '-'}</td>
+        <td>${s.donusLength > 0 ? (s.donusLength / 1000).toFixed(2) + ' km' : '-'}</td>
+      </tr>
+    `).join('');
+    
+    loading.style.display = 'none';
+    summary.style.display = 'block';
+  } catch (err) {
+    loading.innerHTML = `<p class="text-danger">Analitik yüklenemedi: ${err.message}</p>`;
+  }
+}
+
+// =============================================
+// IMPORT/EXPORT FONKSİYONLARI
+// =============================================
+
+document.getElementById('btnExportAll')?.addEventListener('click', async () => {
+  try {
+    const res = await fetch(`${API_BASE}/api/export/all`);
+    const data = await res.json();
+    
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `stop_station_export_${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    
+    log(`✅ ${data.routes.length} hat ve ${data.stops.length} durak dışa aktarıldı`);
+  } catch (err) {
+    alert('Export hatası: ' + err.message);
+  }
+});
+
+document.getElementById('importFile')?.addEventListener('change', (e) => {
+  const btn = document.getElementById('btnImportAll');
+  btn.disabled = !e.target.files.length;
+});
+
+document.getElementById('btnImportAll')?.addEventListener('click', async () => {
+  const fileInput = document.getElementById('importFile');
+  const overwrite = document.getElementById('overwriteData').checked;
+  
+  if (!fileInput.files.length) {
+    alert('Lütfen bir dosya seçin');
+    return;
+  }
+  
+  if (overwrite && !confirm('⚠️ DİKKAT: Mevcut tüm veriler silinecek! Devam etmek istediğinize emin misiniz?')) {
+    return;
+  }
+  
+  try {
+    const file = fileInput.files[0];
+    const text = await file.text();
+    const data = JSON.parse(text);
+    
+    if (!data.routes || !Array.isArray(data.routes)) {
+      throw new Error('Geçersiz dosya formatı');
+    }
+    
+    const btn = document.getElementById('btnImportAll');
+    btn.disabled = true;
+    btn.textContent = '⏳ İçe aktarılıyor...';
+    
+    const res = await fetch(`${API_BASE}/api/import/all`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        routes: data.routes,
+        stops: data.stops,
+        overwrite: overwrite
+      })
+    });
+    
+    const result = await res.json();
+    
+    if (!res.ok) throw new Error(result.error);
+    
+    alert(`✅ Başarılı!\n${result.importedRoutes} hat\n${result.importedStops} durak içe aktarıldı`);
+    
+    fileInput.value = '';
+    btn.disabled = true;
+    btn.textContent = '⬆️ Verileri İçe Aktar';
+    
+    loadRoutes();
+    loadStops();
+    loadAnalytics();
+    
+    log(`✅ Import tamamlandı: ${result.importedRoutes} hat, ${result.importedStops} durak`);
+  } catch (err) {
+    alert('Import hatası: ' + err.message);
+    document.getElementById('btnImportAll').disabled = false;
+    document.getElementById('btnImportAll').textContent = '⬆️ Verileri İçe Aktar';
+  }
+});
 
 // Console'da yardım göster
 console.log('%c🚏 Stop Station - Terminal API Hazır', 'color: #10b981; font-size: 14px; font-weight: bold');
 console.log('%cKomutlar için: stopStation.help()', 'color: #3b82f6; font-size: 12px');
 console.log('%cÖrnek: stopStation.analyzeGPS()', 'color: #6b7280; font-size: 11px');
+
+// =============================================
+// SAHA KONTROL PANELİ
+// =============================================
+
+let fieldMap = null;
+let fieldMarkersLayer = null;
+let fieldRouteLayer = null;
+let fieldActions = [];
+
+window.loadFieldData = async function() {
+  console.log('🔄 Saha kontrol paneli yükleniyor...');
+  
+  // Harita yoksa oluştur
+  if (!fieldMap) {
+    fieldMap = L.map('fieldMap').setView([38.4192, 27.1287], 12);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(fieldMap);
+    fieldMarkersLayer = L.layerGroup().addTo(fieldMap);
+    fieldRouteLayer = L.layerGroup().addTo(fieldMap);
+  }
+  
+  // Hatları dropdown'a yükle
+  const routeSelect = document.getElementById('fieldRouteFilter');
+  routeSelect.innerHTML = '<option value="">Tüm Hatlar</option>';
+  allRoutes.forEach(route => {
+    const option = document.createElement('option');
+    option.value = route.id;
+    option.textContent = `${route.route_number} - ${route.route_name}`;
+    routeSelect.appendChild(option);
+  });
+  
+  // Field actions'ları yükle
+  await loadFieldActions();
+  
+  // Event listeners
+  document.getElementById('fieldRefreshBtn').addEventListener('click', async () => {
+    const routeId = document.getElementById('fieldRouteFilter').value;
+    if (routeId) {
+      await loadRouteOnFieldMap(routeId);
+    } else {
+      alert('Lütfen önce bir hat seçin');
+    }
+  });
+  
+  document.getElementById('fieldRouteFilter').addEventListener('change', async () => {
+    await loadFieldActions();
+    const routeId = document.getElementById('fieldRouteFilter').value;
+    if (routeId) {
+      await loadRouteOnFieldMap(routeId);
+    }
+  });
+  
+  document.getElementById('fieldDirectionFilter').addEventListener('change', () => loadFieldActions());
+  document.getElementById('fieldActionFilter').addEventListener('change', () => loadFieldActions());
+  document.getElementById('fieldDownloadBtn').addEventListener('click', downloadFieldStopsCSV);
+};
+
+async function loadFieldActions() {
+  try {
+    const res = await fetch(`${API_BASE}/api/field-actions`);
+    const data = await res.json();
+    let actions = data.actions || [];
+    
+    // Filtreleri uygula
+    const routeFilter = document.getElementById('fieldRouteFilter')?.value;
+    const directionFilter = document.getElementById('fieldDirectionFilter')?.value;
+    const actionFilter = document.getElementById('fieldActionFilter')?.value;
+    
+    if (routeFilter) {
+      actions = actions.filter(a => a.route_id == routeFilter);
+    }
+    if (directionFilter) {
+      actions = actions.filter(a => a.direction === directionFilter);
+    }
+    if (actionFilter) {
+      actions = actions.filter(a => a.action === actionFilter);
+    }
+    
+    fieldActions = actions;
+    
+    // İstatistikleri güncelle
+    const totalStops = new Set(actions.map(a => a.stop_id)).size;
+    const approved = actions.filter(a => a.action === 'APPROVE').length;
+    const rejected = actions.filter(a => a.action === 'REJECT').length;
+    const added = actions.filter(a => a.action === 'ADD').length;
+    
+    document.getElementById('fieldStatStops').textContent = totalStops;
+    document.getElementById('fieldStatApprove').textContent = approved;
+    document.getElementById('fieldStatReject').textContent = rejected;
+    document.getElementById('fieldStatAdd').textContent = added;
+    document.getElementById('fieldStatTotal').textContent = actions.length;
+    
+    // Listeyi güncelle
+    renderFieldActions(actions);
+  } catch (err) {
+    console.error('Field actions yüklenemedi:', err);
+    document.getElementById('fieldActionsList').innerHTML = `<p class="text-danger">Veri yüklenemedi: ${err.message}</p>`;
+  }
+}
+
+function renderFieldActions(actions) {
+  const list = document.getElementById('fieldActionsList');
+  
+  if (actions.length === 0) {
+    list.innerHTML = '<p class="text-center text-muted py-4">İşlem bulunamadı</p>';
+    return;
+  }
+  
+  // Son 100 işlemi göster
+  const display = actions.slice(0, 100);
+  
+  list.innerHTML = display.map(action => {
+    const route = allRoutes.find(r => r.id === action.route_id);
+    const routeNumber = route?.route_number || '?';
+    const actionColor = action.action === 'APPROVE' ? 'success' : action.action === 'REJECT' ? 'danger' : 'info';
+    const actionIcon = action.action === 'APPROVE' ? '✅' : action.action === 'REJECT' ? '❌' : '➕';
+    const actionText = action.action === 'APPROVE' ? 'Onaylandı' : action.action === 'REJECT' ? 'Reddedildi' : 'Eklendi';
+    
+    return `
+      <div class="border-bottom p-2">
+        <div class="d-flex justify-content-between align-items-center">
+          <div>
+            <span class="badge bg-primary">${routeNumber}</span>
+            <span class="badge bg-${action.direction === 'gidis' ? 'info' : 'warning'}">${action.direction === 'gidis' ? 'Gidiş' : 'Dönüş'}</span>
+            <strong>${action.stop_name || 'Durak'}</strong>
+          </div>
+          <span class="badge bg-${actionColor}">${actionIcon} ${actionText}</span>
+        </div>
+        <small class="text-muted d-block mt-1">
+          ${new Date(action.created_at).toLocaleString('tr-TR')} - ${action.user_name || 'Bilinmiyor'}
+        </small>
+        ${action.notes ? `<small class="text-muted d-block"><em>Not: ${action.notes}</em></small>` : ''}
+      </div>
+    `;
+  }).join('');
+  
+  if (actions.length > 100) {
+    list.innerHTML += `<p class="text-center text-muted py-2">+${actions.length - 100} işlem daha...</p>`;
+  }
+}
+
+async function loadRouteOnFieldMap(routeId) {
+  try {
+    const res = await fetch(`${API_BASE}/api/routes/${routeId}/direction/gidis`);
+    const data = await res.json();
+    
+    fieldMarkersLayer.clearLayers();
+    fieldRouteLayer.clearLayers();
+    
+    // Rotayı çiz
+    if (data.route.polyline && data.route.polyline.length > 0) {
+      L.polyline(data.route.polyline, { color: '#3b82f6', weight: 4 }).addTo(fieldRouteLayer);
+      fieldMap.fitBounds(L.latLngBounds(data.route.polyline).pad(0.1));
+    }
+    
+    // Durakları göster
+    data.stops.forEach(stop => {
+      const marker = L.circleMarker([stop.lat, stop.lon], {
+        radius: 8,
+        fillColor: '#10b981',
+        color: 'white',
+        weight: 2,
+        fillOpacity: 0.8
+      }).addTo(fieldMarkersLayer);
+      
+      marker.bindPopup(`<strong>${stop.name}</strong><br>${stop.lat.toFixed(6)}, ${stop.lon.toFixed(6)}`);
+    });
+  } catch (err) {
+    console.error('Rota yüklenemedi:', err);
+  }
+}
+
+function downloadFieldStopsCSV() {
+  if (fieldActions.length === 0) {
+    alert('İndirilecek veri yok');
+    return;
+  }
+  
+  const csv = 'Durak ID,Hat,Yön,Durak Adı,İşlem,Kullanıcı,Tarih,Not\n' +
+    fieldActions.map(a => {
+      const route = allRoutes.find(r => r.id === a.route_id);
+      return `${a.stop_id},${route?.route_number || '?'},${a.direction},${a.stop_name},${a.action},${a.user_name || ''},${new Date(a.created_at).toLocaleString('tr-TR')},"${a.notes || ''}"`;
+    }).join('\n');
+  
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = `field_actions_${new Date().toISOString().split('T')[0]}.csv`;
+  link.click();
+}
