@@ -76,7 +76,7 @@ function updateStats() {
   document.getElementById('statReject').textContent = stats.reject;
   document.getElementById('statAdd').textContent = stats.add;
   document.getElementById('statTotal').textContent = stats.total;
-} - Kompakt tek satır format
+}// Aksiyonları göster - Kompakt tek satır format
 function displayActions(actions) {
   const container = document.getElementById('actionsList');
   
@@ -110,9 +110,7 @@ function displayActions(actions) {
       <div class="action-item action-${action.action_type}">
         <span class="action-type-mini type-${action.action_type}">${typeEmoji}</span>
         <span class="action-time-mini">${timeStr}</span>
-        <span class="action-info">Hat ${action.route_id} • ${stopName} • ${action.direction === 'gidis' ? 'Gidiş' : 'Dönüş'} • ${action.route_s?.toFixed(0) || 'N/A'}m</spanv><strong>Taraf:</strong> ${action.side === 'LEFT' ? 'Sol' : 'Sağ'}</div>
-          ${action.notes ? `<div><strong>Not:</strong> ${action.notes}</div>` : ''}
-        </div>
+        <span class="action-info">Hat ${action.route_id} • ${stopName} • ${action.direction === 'gidis' ? 'Gidiş' : 'Dönüş'} • ${action.route_s?.toFixed(0) || 'N/A'}m</span>
       </div>
     `;
   }).join('');
