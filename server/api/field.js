@@ -191,14 +191,21 @@ export const fieldRoutes = (app) => {
   });
 
   // Saha aksiyonlarını getir (dashboard için)
-  app.get('/api/field/actions', async (req, res) => {
+  app.get('/api/field-actions', async (req, res) => {
     try {
       const { route_id, direction, user_id } = req.query;
       
       let query = supabase
         .from('field_actions')
-        .select('*, stops(name, lat, lon)')
-        .order('timestamp', { ascending: false });
+        .select(`
+          *,
+          stops (
+            name,
+            lat,
+            lon
+          )
+        `)
+        .order('created_at', { ascending: false });
       
       if (route_id) query = query.eq('route_id', route_id);
       if (direction) query = query.eq('direction', direction);
@@ -207,8 +214,18 @@ export const fieldRoutes = (app) => {
       const { data, error } = await query;
       if (error) throw error;
 
-      res.json({ actions: data });
+      // Düzleştir: stop bilgisini yukarı çıkar
+      const formattedData = data.map(action => ({
+        ...action,
+        stop_name: action.stops?.name || 'Bilinmiyor',
+        stop_lat: action.stops?.lat,
+        stop_lon: action.stops?.lon,
+        action: action.action_type // Frontend action beklediği için
+      }));
+
+      res.json({ actions: formattedData });
     } catch (err) {
+      console.error('[GET /api/field-actions] Error:', err);
       res.status(500).json({ error: err.message });
     }
   });
