@@ -41,6 +41,15 @@ import { supabase } from './supabaseClient.js';
 routeRoutes(app);
 fieldRoutes(app);
 
+// 🏓 Health check & keep-alive endpoint (Render free tier sleep prevention)
+app.get('/api/health', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime() 
+  });
+});
+
 // ✅ Tüm durakları getir (Saha Kontrol Paneli için)
 app.get('/api/stops', async (req, res) => {
   try {
