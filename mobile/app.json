@@ -13,7 +13,10 @@
     },
     "updates": {
       "url": "https://u.expo.dev/a6fa4bf5-e6e8-437d-a857-a3f5a8d187e1",
-      "fallbackToCacheTimeout": 0
+      "fallbackToCacheTimeout": 0,
+      "requestHeaders": {
+        "expo-channel-name": "production"
+      }
     },
     "runtimeVersion": {
       "policy": "appVersion"
@@ -57,7 +60,8 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "a6fa4bf5-e6e8-437d-a857-a3f5a8d187e1"
+        "projectId": "a6fa4bf5-e6e8-437d-a857-a3f5a8d187e1",
+        "channel": "production"
       }
     },
     "owner": "hugoo61"
