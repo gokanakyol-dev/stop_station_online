@@ -205,7 +205,7 @@ export const fieldRoutes = (app) => {
             lon
           )
         `)
-        .order('created_at', { ascending: false });
+        .order('timestamp', { ascending: false });
       
       if (route_id) query = query.eq('route_id', route_id);
       if (direction) query = query.eq('direction', direction);
@@ -220,7 +220,8 @@ export const fieldRoutes = (app) => {
         stop_name: action.stops?.name || 'Bilinmiyor',
         stop_lat: action.stops?.lat,
         stop_lon: action.stops?.lon,
-        action: action.action_type // Frontend action beklediği için
+        action: action.action_type, // Frontend action beklediği için
+        created_at: action.timestamp // created_at yerine timestamp kullan
       }));
 
       res.json({ actions: formattedData });
