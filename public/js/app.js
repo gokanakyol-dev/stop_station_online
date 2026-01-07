@@ -1627,21 +1627,49 @@ async function loadRouteOnFieldMap(routeId) {
   }
 }
 
-function downloadFieldStopsCSV() {
-  if (fieldActions.length === 0) {
-    alert('İndirilecek veri yok');
-    return;
+async function downloadFieldStopsCSV() {
+  try {
+    // Tüm durakları çek
+    const res = await fetch(`${API_BASE}/api/stops`);
+    const data = await res.json();
+    let stops = data.stops || [];
+    
+    // Filtreleri uygula (seçili hat ve yön)
+    const routeFilter = document.getElementById('fieldRouteFilter')?.value;
+    const directionFilter = document.getElementById('fieldDirectionFilter')?.value;
+    
+    if (routeFilter) {
+      stops = stops.filter(s => s.route_id == routeFilter);
+    }
+    if (directionFilter) {
+      stops = stops.filter(s => s.direction === directionFilter);
+    }
+    
+    // ✅ Sadece ONAYLANAN durakları filtrele
+    const approvedStops = stops.filter(s => s.field_verified === true);
+    
+    if (approvedStops.length === 0) {
+      alert('Onaylanmış durak bulunamadı!');
+      return;
+    }
+    
+    // CSV oluştur
+    const csv = 'Durak ID,Hat ID,Yön,Durak Adı,Enlem,Boylam,Onaylanma Tarihi\n' +
+      approvedStops.map(s => {
+        const route = allRoutes.find(r => r.id === s.route_id);
+        const routeNumber = route?.route_number || s.route_id;
+        return `${s.id},${routeNumber},${s.direction},${s.name || 'Durak'},${s.lat},${s.lon},"${s.last_verified_at ? new Date(s.last_verified_at).toLocaleString('tr-TR') : ''}"`;
+      }).join('\n');
+    
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `onaylanan_duraklar_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+    
+    console.log(`✅ ${approvedStops.length} onaylanmış durak CSV'ye aktarıldı`);
+  } catch (err) {
+    console.error('CSV indirme hatası:', err);
+    alert('CSV indirilemedi: ' + err.message);
   }
-  
-  const csv = 'Durak ID,Hat,Yön,Durak Adı,İşlem,Kullanıcı,Tarih,Not\n' +
-    fieldActions.map(a => {
-      const route = allRoutes.find(r => r.id === a.route_id);
-      return `${a.stop_id},${route?.route_number || '?'},${a.direction},${a.stop_name},${a.action},${a.user_name || ''},${new Date(a.created_at).toLocaleString('tr-TR')},"${a.notes || ''}"`;
-    }).join('\n');
-  
-  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
-  const link = document.createElement('a');
-  link.href = URL.createObjectURL(blob);
-  link.download = `field_actions_${new Date().toISOString().split('T')[0]}.csv`;
-  link.click();
 }
