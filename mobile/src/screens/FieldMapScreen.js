@@ -17,7 +17,8 @@ import {
   approveStop,
   rejectStop,
   addStop,
-  getOfflineQueueSize
+  getOfflineQueueSize,
+  syncOfflineQueue
 } from '../services/api';
 import {
   buildRouteSkeleton,
@@ -73,18 +74,57 @@ export default function FieldMapScreen({ route, navigation }) {
   useEffect(() => {
     initializeMap();
     checkQueue();
-    const interval = setInterval(checkQueue, 5000); // Her 5 saniyede kontrol
+    const queueCheckInterval = setInterval(checkQueue, 5000); // Her 5 saniyede kontrol
+    const syncInterval = setInterval(syncQueue, 30000); // Her 30 saniyede otomatik senkronizasyon
+    
     return () => {
       if (locationSubscription.current) {
         locationSubscription.current.remove();
       }
-      clearInterval(interval);
+      clearInterval(queueCheckInterval);
+      clearInterval(syncInterval);
     };
   }, []);
 
   const checkQueue = async () => {
     const size = await getOfflineQueueSize();
     setQueueSize(size);
+  };
+
+  const syncQueue = async () => {
+    const size = await getOfflineQueueSize();
+    if (size === 0) {
+      console.log('[syncQueue] Queue boş, senkronizasyon gerekmiyor');
+      return;
+    }
+
+    console.log('[syncQueue] Otomatik senkronizasyon başlıyor...', size, 'öğe');
+    try {
+      const result = await syncOfflineQueue();
+      
+      if (result.synced > 0) {
+        Alert.alert(
+          '✅ Senkronizasyon Tamamlandı',
+          `${result.synced} işlem başarıyla gönderildi.${result.failed > 0 ? `\n${result.failed} işlem başarısız.` : ''}`
+        );
+        
+        // Queue size'ı güncelle
+        await checkQueue();
+        
+        // Durakları yeniden yükle (güncel veri için)
+        const data = await getRouteWithDirection(routeId, direction);
+        setStops(data.stops || []);
+      } else if (result.failed > 0) {
+        Alert.alert(
+          '⚠️ Senkronizasyon Hatası',
+          `${result.failed} işlem gönderilemedi. Lütfen internet bağlantınızı kontrol edin.`
+        );
+      }
+      
+      console.log('[syncQueue] Senkronizasyon sonucu:', result);
+    } catch (error) {
+      console.error('[syncQueue] Senkronizasyon hatası:', error);
+    }
   };
 
   const initializeMap = async () => {
@@ -686,12 +726,24 @@ export default function FieldMapScreen({ route, navigation }) {
 
       {/* Yeni durak ekle butonu - Floating */}
       {!activeStop && (
-        <TouchableOpacity
-          style={styles.addButton}
-          onPress={() => setShowAddModal(true)}
-        >
-          <Text style={styles.addButtonText}>+</Text>
-        </TouchableOpacity>
+        <>
+          <TouchableOpacity
+            style={styles.addButton}
+            onPress={() => setShowAddModal(true)}
+          >
+            <Text style={styles.addButtonText}>+</Text>
+          </TouchableOpacity>
+          
+          {/* Senkronizasyon butonu */}
+          {queueSize > 0 && (
+            <TouchableOpacity
+              style={styles.syncButton}
+              onPress={syncQueue}
+            >
+              <Text style={styles.syncButtonText}>⟳ {queueSize}</Text>
+            </TouchableOpacity>
+          )}
+        </>
       )}
 
       {/* Yeni durak modal */}
@@ -1360,6 +1412,29 @@ const styles = StyleSheet.create({
   },
   addButtonText: {
     fontSize: 32,
+    fontWeight: '800',
+    color: '#FFFFFF'
+  },
+  syncButton: {
+    position: 'absolute',
+    bottom: 320,
+    right: 20,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#F59E0B',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#F59E0B',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.5,
+    shadowRadius: 16,
+    elevation: 12,
+    borderWidth: 3,
+    borderColor: 'rgba(255, 255, 255, 0.3)'
+  },
+  syncButtonText: {
+    fontSize: 24,
     fontWeight: '800',
     color: '#FFFFFF'
   },
