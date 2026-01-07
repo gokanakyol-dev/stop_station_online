@@ -1,11 +1,12 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import RouteSelectionScreen from './src/screens/RouteSelectionScreen';
 import FieldMapScreen from './src/screens/FieldMapScreen';
 import StatsScreen from './src/screens/StatsScreen';
-import { Text, View } from 'react-native';
+import { Text, View, Alert } from 'react-native';
+import * as Updates from 'expo-updates';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -31,6 +32,43 @@ function FieldStack() {
 }
 
 export default function App() {
+  useEffect(() => {
+    async function checkForUpdates() {
+      try {
+        // Sadece production build'lerde çalışır (Expo Go'da değil)
+        if (!__DEV__) {
+          console.log('[Updates] Güncelleme kontrol ediliyor...');
+          const update = await Updates.checkForUpdateAsync();
+          
+          if (update.isAvailable) {
+            console.log('[Updates] Yeni güncelleme bulundu, indiriliyor...');
+            await Updates.fetchUpdateAsync();
+            console.log('[Updates] Güncelleme indirildi, yeniden başlatılıyor...');
+            
+            Alert.alert(
+              '🎉 Güncelleme Hazır',
+              'Yeni özellikler yüklendi. Uygulama yeniden başlatılacak.',
+              [
+                {
+                  text: 'Tamam',
+                  onPress: async () => {
+                    await Updates.reloadAsync();
+                  }
+                }
+              ]
+            );
+          } else {
+            console.log('[Updates] Uygulama güncel');
+          }
+        }
+      } catch (error) {
+        console.error('[Updates] Güncelleme kontrol hatası:', error);
+      }
+    }
+    
+    checkForUpdates();
+  }, []);
+
   return (
     <NavigationContainer>
       <Tab.Navigator
