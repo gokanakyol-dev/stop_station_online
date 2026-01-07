@@ -134,9 +134,8 @@ export const fieldRoutes = (app) => {
         return res.status(400).json({ error: 'location.lat ve location.lon zorunlu' });
       }
       
-      if (!location.route_s && location.route_s !== 0) {
-        return res.status(400).json({ error: 'route_s zorunlu (harita tıklamasından projeksiyon gerekli)' });
-      }
+      // route_s artık opsiyonel - projeksiyon hesaplanamayabilir (rota dışı noktalar için)
+      // NOT: route_s null ise sequence_number da null kalacak
       
       if (!direction || !['gidis', 'donus'].includes(direction)) {
         return res.status(400).json({ error: 'direction sadece gidis veya donus olabilir' });
@@ -151,7 +150,7 @@ export const fieldRoutes = (app) => {
           name: name || 'Yeni Durak',
           lat: location.lat,
           lon: location.lon,
-          route_s: location.route_s,
+          route_s: location.route_s ?? null,  // ✅ Projeksiyon yoksa null
           lateral_offset: location.lateral_offset ?? null,
           side: location.side ?? null,
           sequence_number: null, // ✅ Şimdilik NULL, batch job ile doldurulacak

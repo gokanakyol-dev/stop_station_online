@@ -233,7 +233,7 @@ export default function RouteSelectionScreen({ navigation }) {
         <Text style={styles.title}>DURAK DOĞRULAMA</Text>
         <View style={styles.subtitleRow}>
           <Text style={styles.subtitle}>Hat ve yön seçin</Text>
-          <Text style={styles.version}>v1.2.1</Text>
+          <Text style={styles.version}>v1.2.3</Text>
         </View>
       </View>
 

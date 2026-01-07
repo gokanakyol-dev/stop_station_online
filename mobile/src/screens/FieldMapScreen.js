@@ -8,8 +8,11 @@ import {
   Alert,
   Modal,
   TextInput,
-  ScrollView
+  ScrollView,
+  ToastAndroid,
+  Platform
 } from 'react-native';
+import NetInfo from '@react-native-community/netinfo';
 import MapView, { Polyline, Marker, Circle } from 'react-native-maps';
 import * as Location from 'expo-location';
 import {
@@ -72,12 +75,17 @@ export default function FieldMapScreen({ route, navigation }) {
   const locationSubscription = useRef(null);
 
   useEffect(() => {
+    console.log('[FieldMapScreen] 🚀 Component mounted - v1.2.2');
     initializeMap();
     checkQueue();
     const queueCheckInterval = setInterval(checkQueue, 5000); // Her 5 saniyede kontrol
-    const syncInterval = setInterval(syncQueue, 30000); // Her 30 saniyede otomatik senkronizasyon
+    const syncInterval = setInterval(() => {
+      console.log('[FieldMapScreen] ⏰ 30sn interval triggered');
+      syncQueue();
+    }, 30000); // Her 30 saniyede otomatik senkronizasyon
     
     return () => {
+      console.log('[FieldMapScreen] 🛑 Component unmounting');
       if (locationSubscription.current) {
         locationSubscription.current.remove();
       }
@@ -91,39 +99,60 @@ export default function FieldMapScreen({ route, navigation }) {
     setQueueSize(size);
   };
 
+  // Toast mesajı göster
+  const showToast = (message) => {
+    if (Platform.OS === 'android') {
+      ToastAndroid.show(message, ToastAndroid.SHORT);
+    } else {
+      // iOS için Alert kullan
+      Alert.alert('', message);
+    }
+  };
+
   const syncQueue = async () => {
     const size = await getOfflineQueueSize();
     if (size === 0) {
-      console.log('[syncQueue] Queue boş, senkronizasyon gerekmiyor');
+      console.log('[syncQueue] Queue boş');
       return;
     }
 
-    console.log('[syncQueue] Otomatik senkronizasyon başlıyor...', size, 'öğe');
+    // İnternet kontrolü
+    try {
+      const netState = await NetInfo.fetch();
+      if (!netState.isConnected) {
+        console.log('[syncQueue] İnternet yok, senkronizasyon ertelendi');
+        return;
+      }
+    } catch (e) {
+      console.log('[syncQueue] NetInfo hatası, devam ediliyor');
+    }
+
+    console.log('[syncQueue] 🔄 Otomatik senkronizasyon başlıyor...', size, 'öğe');
+    showToast('🔄 Senkronize ediliyor...');
+    
     try {
       const result = await syncOfflineQueue();
       
       if (result.synced > 0) {
-        Alert.alert(
-          '✅ Senkronizasyon Tamamlandı',
-          `${result.synced} işlem başarıyla gönderildi.${result.failed > 0 ? `\n${result.failed} işlem başarısız.` : ''}`
-        );
+        showToast(`✅ ${result.synced} işlem gönderildi`);
         
         // Queue size'ı güncelle
         await checkQueue();
         
         // Durakları yeniden yükle (güncel veri için)
-        const data = await getRouteWithDirection(routeId, direction);
-        setStops(data.stops || []);
+        try {
+          const data = await getRouteWithDirection(routeId, direction);
+          setStops(data.stops || []);
+        } catch (e) {
+          console.log('[syncQueue] Durak yenileme hatası:', e);
+        }
       } else if (result.failed > 0) {
-        Alert.alert(
-          '⚠️ Senkronizasyon Hatası',
-          `${result.failed} işlem gönderilemedi. Lütfen internet bağlantınızı kontrol edin.`
-        );
+        showToast(`⚠️ ${result.failed} işlem başarısız`);
       }
       
-      console.log('[syncQueue] Senkronizasyon sonucu:', result);
+      console.log('[syncQueue] Sonuç:', result);
     } catch (error) {
-      console.error('[syncQueue] Senkronizasyon hatası:', error);
+      console.error('[syncQueue] Hata:', error);
     }
   };
 
@@ -243,33 +272,31 @@ export default function FieldMapScreen({ route, navigation }) {
         locationData.side = projection.side;
       }
 
-      // ✅ Optimistic update - UI'yi hemen güncelle
+      // ✅ Optimistic update - UI'yi HEMEN güncelle
       setStops(stops.map(s =>
         s.id === stop.id ? { ...s, field_verified: true, field_rejected: false } : s
       ));
       if (upcomingStop?.id === stop.id) {
         setUpcomingStop({ ...upcomingStop, field_verified: true, field_rejected: false });
       }
-      
-      // Kullanıcı renk değişimini görsün diye kısa gecikme
-      await new Promise(resolve => setTimeout(resolve, 300));
-      
       setActiveStop(null);
 
-      console.log('[handleApproveStop] Sending API call', { stopId: stop.id, locationData });
-      const result = await approveStop(
-        stop.id,
-        routeId,
-        direction,
-        locationData
-      );
-      console.log('[handleApproveStop] API result', result);
-
-      if (result.offline) {
-        Alert.alert('⌛ Offline', 'Durak onayı kuyrukta. İnternet bağlantısında gönderilecek.');
-      } else {
-        Alert.alert('✅', 'Durak onaylandı');
-      }
+      // API çağrısını arka planda yap (beklemeden)
+      console.log('[handleApproveStop] API call başlatılıyor...');
+      approveStop(stop.id, routeId, direction, locationData)
+        .then(result => {
+          console.log('[handleApproveStop] API result', result);
+          if (result.offline) {
+            showToast('⌛ Kuyrukta - offline');
+          } else {
+            showToast('✅ Onaylandı');
+          }
+          checkQueue();
+        })
+        .catch(err => {
+          console.error('[handleApproveStop] Error', err);
+          showToast('❌ Hata: ' + err.message);
+        });
     } catch (error) {
       console.error('[handleApproveStop] Error', error);
       Alert.alert('Hata', error.message);
@@ -313,37 +340,34 @@ export default function FieldMapScreen({ route, navigation }) {
         locationData.side = projection.side;
       }
 
-      // ✅ Optimistic update - UI'yi hemen güncelle
+      // ✅ Optimistic update - UI'yi HEMEN güncelle
       setStops(stops.map(s =>
         s.id === stop.id ? { ...s, field_rejected: true, field_verified: false } : s
       ));
       if (upcomingStop?.id === stop.id) {
         setUpcomingStop({ ...upcomingStop, field_rejected: true, field_verified: false });
       }
-      
-      // Kullanıcı renk değişimini görsün diye kısa gecikme
-      await new Promise(resolve => setTimeout(resolve, 300));
-      
       setActiveStop(null);
       setShowRejectModal(false);
       setRejectReason('');
       setStopToReject(null);
 
-      console.log('[handleRejectStop] Sending API call', { stopId: stop.id, locationData, reason });
-      const result = await rejectStop(
-        stop.id,
-        routeId,
-        direction,
-        locationData,
-        reason || 'Sebep belirtilmedi'
-      );
-      console.log('[handleRejectStop] API result', result);
-
-      if (result.offline) {
-        Alert.alert('⌛ Offline', 'Durak reddi kuyrukta. İnternet bağlantısında gönderilecek.');
-      } else {
-        Alert.alert('❌', 'Durak reddedildi');
-      }
+      // API çağrısını arka planda yap (beklemeden)
+      console.log('[handleRejectStop] API call başlatılıyor...');
+      rejectStop(stop.id, routeId, direction, locationData, reason || 'Sebep belirtilmedi')
+        .then(result => {
+          console.log('[handleRejectStop] API result', result);
+          if (result.offline) {
+            showToast('⌛ Kuyrukta - offline');
+          } else {
+            showToast('❌ Reddedildi');
+          }
+          checkQueue();
+        })
+        .catch(err => {
+          console.error('[handleRejectStop] Error', err);
+          showToast('❌ Hata: ' + err.message);
+        });
     } catch (error) {
       console.error('[handleRejectStop] Error', error);
       Alert.alert('Hata', error.message);
