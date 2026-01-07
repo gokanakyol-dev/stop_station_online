@@ -9,6 +9,20 @@ export const fieldRoutes = (app) => {
       
       console.log('[approve] Received:', { stop_id, route_id, direction, user_id, location });
       
+      // Önce stop bilgisini çek - route_s için stop koordinatlarından projeksiyon alacağız
+      const { data: stop, error: stopFetchError } = await supabase
+        .from('stops')
+        .select('lat, lon')
+        .eq('id', stop_id)
+        .single();
+      
+      if (stopFetchError) throw stopFetchError;
+      
+      // route_s her zaman stop koordinatlarından gelsin (userLocation değil!)
+      const finalLocation = location || {};
+      const fieldLat = finalLocation.lat ?? stop.lat;
+      const fieldLon = finalLocation.lon ?? stop.lon;
+      
       const { data, error } = await supabase
         .from('field_actions')
         .insert([{
@@ -17,11 +31,11 @@ export const fieldRoutes = (app) => {
           route_id,
           direction,
           user_id,
-          field_lat: location?.lat ?? null,
-          field_lon: location?.lon ?? null,
-          route_s: location?.route_s ?? null,
-          lateral_offset: location?.lateral_offset ?? null,
-          side: location?.side ?? null,
+          field_lat: fieldLat,
+          field_lon: fieldLon,
+          route_s: finalLocation.route_s ?? null,
+          lateral_offset: finalLocation.lateral_offset ?? null,
+          side: finalLocation.side ?? null,
           timestamp: new Date().toISOString()
         }])
         .select();
@@ -31,10 +45,15 @@ export const fieldRoutes = (app) => {
         throw error;
       }
 
-      // Durağı onaylandı olarak işaretle
+      // ✅ KRİTİK: Durağı onaylandı olarak işaretle + reject=false
+      // geom otomatik trigger ile güncellenecek
       await supabase
         .from('stops')
-        .update({ field_verified: true, last_verified_at: new Date().toISOString() })
+        .update({ 
+          field_verified: true,
+          field_rejected: false, // ✅ Çelişki önleme
+          last_verified_at: new Date().toISOString()
+        })
         .eq('id', stop_id);
 
       console.log('[approve] Success:', data[0]);
@@ -52,6 +71,19 @@ export const fieldRoutes = (app) => {
       
       console.log('[reject] Received:', { stop_id, route_id, direction, user_id, location, reason });
       
+      // Önce stop bilgisini çek - route_s için stop koordinatlarından projeksiyon
+      const { data: stop, error: stopFetchError } = await supabase
+        .from('stops')
+        .select('lat, lon')
+        .eq('id', stop_id)
+        .single();
+      
+      if (stopFetchError) throw stopFetchError;
+      
+      const finalLocation = location || {};
+      const fieldLat = finalLocation.lat ?? stop.lat;
+      const fieldLon = finalLocation.lon ?? stop.lon;
+      
       const { data, error } = await supabase
         .from('field_actions')
         .insert([{
@@ -60,11 +92,11 @@ export const fieldRoutes = (app) => {
           route_id,
           direction,
           user_id,
-          field_lat: location?.lat ?? null,
-          field_lon: location?.lon ?? null,
-          route_s: location?.route_s ?? null,
-          lateral_offset: location?.lateral_offset ?? null,
-          side: location?.side ?? null,
+          field_lat: fieldLat,
+          field_lon: fieldLon,
+          route_s: finalLocation.route_s ?? null,
+          lateral_offset: finalLocation.lateral_offset ?? null,
+          side: finalLocation.side ?? null,
           notes: reason,
           timestamp: new Date().toISOString()
         }])
@@ -75,10 +107,13 @@ export const fieldRoutes = (app) => {
         throw error;
       }
 
-      // Durağı reddedildi olarak işaretle
+      // ✅ KRİTİK: Durağı reddedildi olarak işaretle + verify=false
       await supabase
         .from('stops')
-        .update({ field_verified: false, field_rejected: true })
+        .update({ 
+          field_verified: false, // ✅ Çelişki önleme
+          field_rejected: true 
+        })
         .eq('id', stop_id);
 
       console.log('[reject] Success:', data[0]);
@@ -94,8 +129,20 @@ export const fieldRoutes = (app) => {
     try {
       const { route_id, direction, user_id, location, name } = req.body;
       
-      // Önce yeni durağı ekle
-      const geom = `SRID=4326;POINT(${location.lon} ${location.lat})`;
+      // ✅ KRİTİK: Zorunlu alanları kontrol et
+      if (!location || !location.lat || !location.lon) {
+        return res.status(400).json({ error: 'location.lat ve location.lon zorunlu' });
+      }
+      
+      if (!location.route_s && location.route_s !== 0) {
+        return res.status(400).json({ error: 'route_s zorunlu (harita tıklamasından projeksiyon gerekli)' });
+      }
+      
+      if (!direction || !['gidis', 'donus'].includes(direction)) {
+        return res.status(400).json({ error: 'direction sadece gidis veya donus olabilir' });
+      }
+      
+      // ✅ KRİTİK: Yeni durağı ekle - geom trigger ile otomatik dolacak
       const { data: stopData, error: stopError } = await supabase
         .from('stops')
         .insert([{
@@ -105,11 +152,12 @@ export const fieldRoutes = (app) => {
           lat: location.lat,
           lon: location.lon,
           route_s: location.route_s,
-          lateral_offset: location.lateral_offset,
-          side: location.side,
+          lateral_offset: location.lateral_offset ?? null,
+          side: location.side ?? null,
+          sequence_number: null, // ✅ Şimdilik NULL, batch job ile doldurulacak
           field_added: true,
           field_verified: true,
-          geom
+          field_rejected: false
         }])
         .select();
       
@@ -127,8 +175,8 @@ export const fieldRoutes = (app) => {
           field_lat: location.lat,
           field_lon: location.lon,
           route_s: location.route_s,
-          lateral_offset: location.lateral_offset,
-          side: location.side,
+          lateral_offset: location.lateral_offset ?? null,
+          side: location.side ?? null,
           timestamp: new Date().toISOString()
         }])
         .select();
@@ -137,6 +185,7 @@ export const fieldRoutes = (app) => {
 
       res.json({ status: 'ok', stop: stopData[0], action: actionData[0] });
     } catch (err) {
+      console.error('[add] Error:', err.message);
       res.status(500).json({ error: err.message });
     }
   });

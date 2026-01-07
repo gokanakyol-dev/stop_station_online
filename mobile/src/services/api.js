@@ -266,7 +266,7 @@ export const syncOfflineQueue = async () => {
     
     for (const item of queue) {
       try {
-        console.log('[syncOfflineQueue] Syncing item:', item.actionType, item.payload?.stop_id);
+        console.log('[syncOfflineQueue] Syncing item:', item.actionType, item.payload?.stop_id || item.payload?.name);
         let response;
         switch (item.actionType) {
           case 'approve':
@@ -282,8 +282,12 @@ export const syncOfflineQueue = async () => {
         console.log('[syncOfflineQueue] Item synced successfully:', response.data);
         results.push({ success: true, item });
       } catch (error) {
-        console.error('[syncOfflineQueue] Item sync failed:', error.message, error.response?.data);
-        results.push({ success: false, item, error: error.message });
+        console.error('[syncOfflineQueue] Item sync failed:', {
+          message: error.message,
+          status: error.response?.status,
+          data: error.response?.data
+        });
+        results.push({ success: false, item, error: error.response?.data?.error || error.message });
       }
     }
     
@@ -293,9 +297,9 @@ export const syncOfflineQueue = async () => {
     
     const synced = results.filter(r => r.success).length;
     const failed = results.filter(r => !r.success).length;
-    console.log('[syncOfflineQueue] Sync complete. Synced:', synced, 'Failed:', failed);
+    console.log('[syncOfflineQueue] Sync complete. Synced:', synced, 'Failed:', failed, 'Remaining:', remaining.length);
     
-    return { synced, failed, results };
+    return { synced, failed, remaining: remaining.length, results };
   } catch (error) {
     console.error('[syncOfflineQueue] Sync error:', error);
     return { synced: 0, failed: 0, error: error.message };

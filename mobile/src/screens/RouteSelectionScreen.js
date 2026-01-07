@@ -9,7 +9,7 @@ import {
   Alert,
   TextInput
 } from 'react-native';
-import { getRoutes, getFieldActions, syncOfflineQueue, getOfflineQueueSize } from '../services/api';
+import { getRoutes, getFieldActions, syncOfflineQueue, getOfflineQueueSize, clearOfflineQueue } from '../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const getCachedData = async (key) => {
@@ -130,23 +130,38 @@ export default function RouteSelectionScreen({ navigation }) {
     
     Alert.alert(
       'Senkronizasyon',
-      `${queueSize} bekleyen aksiyon senkronize edilsin mi?`,
+      `${queueSize} bekleyen aksiyon var. Ne yapmak istersiniz?`,
       [
         { text: 'İptal', style: 'cancel' },
         {
+          text: 'Sil',
+          style: 'destructive',
+          onPress: async () => {
+            await clearOfflineQueue();
+            await checkOfflineQueue();
+            Alert.alert('✅', 'Kuyruk temizlendi');
+          }
+        },
+        {
           text: 'Senkronize Et',
           onPress: async () => {
-            const results = await syncOfflineQueue();
-            const success = results.filter(r => r.success).length;
-            const failed = results.filter(r => !r.success).length;
-            
-            Alert.alert(
-              'Senkronizasyon Tamamlandı',
-              `✅ ${success} başarılı\n❌ ${failed} başarısız`
-            );
-            
-            await checkOfflineQueue();
-            await loadRecentActions();
+            try {
+              const result = await syncOfflineQueue();
+              
+              if (result.synced > 0 || result.failed > 0) {
+                Alert.alert(
+                  'Senkronizasyon Tamamlandı',
+                  `✅ ${result.synced} başarılı\n❌ ${result.failed} başarısız${result.remaining > 0 ? `\n⏳ ${result.remaining} kalan` : ''}`
+                );
+              } else if (result.error) {
+                Alert.alert('Hata', result.error);
+              }
+              
+              await checkOfflineQueue();
+              await loadRecentActions();
+            } catch (error) {
+              Alert.alert('Hata', error.message);
+            }
           }
         }
       ]

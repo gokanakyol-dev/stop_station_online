@@ -17,9 +17,9 @@ CREATE TABLE IF NOT EXISTS routes (
 CREATE TABLE IF NOT EXISTS stops (
   id BIGSERIAL PRIMARY KEY,
   route_id BIGINT REFERENCES routes(id) ON DELETE CASCADE,
-  direction VARCHAR(10) NOT NULL, -- 'gidis' veya 'donus'
+  direction VARCHAR(10) NOT NULL CHECK (direction IN ('gidis', 'donus')), -- ✅ KRİTİK: direction validation
   name VARCHAR(255) NOT NULL,
-  sequence_number INTEGER,
+  sequence_number INTEGER, -- ✅ Şimdilik NULL, batch job ile doldurulacak
   lat DOUBLE PRECISION NOT NULL,
   lon DOUBLE PRECISION NOT NULL,
   route_s DOUBLE PRECISION, -- Route boyunca mesafe (metre)
@@ -29,22 +29,23 @@ CREATE TABLE IF NOT EXISTS stops (
   field_rejected BOOLEAN DEFAULT FALSE, -- Sahada reddedildi mi?
   field_added BOOLEAN DEFAULT FALSE, -- Sahadan mı eklendi?
   last_verified_at TIMESTAMPTZ,
-  geom GEOGRAPHY(POINT, 4326),
+  geom GEOGRAPHY(POINT, 4326), -- ✅ KRİTİK: Spatial index için
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  CONSTRAINT chk_verified_rejected CHECK (NOT (field_verified = true AND field_rejected = true)) -- ✅ KRİTİK: Çelişki önleme
 );
 
 -- 3. FIELD_ACTIONS TABLOSU
 -- Sahadan yapılan tüm işlemlerin kaydı
 CREATE TABLE IF NOT EXISTS field_actions (
   id BIGSERIAL PRIMARY KEY,
-  action_type VARCHAR(20) NOT NULL, -- 'APPROVE', 'REJECT', 'ADD'
+  action_type VARCHAR(20) NOT NULL CHECK (action_type IN ('APPROVE', 'REJECT', 'ADD')), -- ✅ validation
   stop_id BIGINT REFERENCES stops(id) ON DELETE SET NULL,
   route_id BIGINT REFERENCES routes(id) ON DELETE CASCADE,
-  direction VARCHAR(10) NOT NULL,
+  direction VARCHAR(10) NOT NULL CHECK (direction IN ('gidis', 'donus')), -- ✅ validation
   user_id VARCHAR(100), -- Saha personeli ID
-  field_lat DOUBLE PRECISION NOT NULL, -- İşlem anındaki GPS konumu
-  field_lon DOUBLE PRECISION NOT NULL,
+  field_lat DOUBLE PRECISION, -- ✅ NULL olabilir (GPS kapalıysa)
+  field_lon DOUBLE PRECISION, -- ✅ NULL olabilir
   route_s DOUBLE PRECISION, -- İşlem anındaki route_s
   lateral_offset DOUBLE PRECISION,
   side VARCHAR(10),
@@ -91,6 +92,35 @@ CREATE INDEX IF NOT EXISTS idx_stops_field_verified ON stops(field_verified);
 CREATE INDEX IF NOT EXISTS idx_field_actions_route ON field_actions(route_id, direction);
 CREATE INDEX IF NOT EXISTS idx_field_actions_timestamp ON field_actions(timestamp DESC);
 CREATE INDEX IF NOT EXISTS idx_stops_geom ON stops USING GIST(geom);
+
+-- ✅ KRİTİK: geom Güncelleme Fonksiyonu
+-- Stops tablosunda geom alanını güncellemek için RPC function
+CREATE OR REPLACE FUNCTION update_stop_geom(p_stop_id BIGINT, p_lon DOUBLE PRECISION, p_lat DOUBLE PRECISION)
+RETURNS void AS $$
+BEGIN
+  UPDATE stops
+  SET geom = ST_SetSRID(ST_MakePoint(p_lon, p_lat), 4326)::geography,
+      updated_at = NOW()
+  WHERE id = p_stop_id;
+END;
+$$ LANGUAGE plpgsql;
+
+-- ✅ KRİTİK: Trigger - INSERT/UPDATE sırasında otomatik geom doldurma
+CREATE OR REPLACE FUNCTION populate_geom()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.lat IS NOT NULL AND NEW.lon IS NOT NULL THEN
+    NEW.geom := ST_SetSRID(ST_MakePoint(NEW.lon, NEW.lat), 4326)::geography;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trigger_populate_geom ON stops;
+CREATE TRIGGER trigger_populate_geom
+  BEFORE INSERT OR UPDATE ON stops
+  FOR EACH ROW
+  EXECUTE FUNCTION populate_geom();
 
 -- ÖRNEK VERI EKLEME (Test için)
 -- Gerçek verilerinizi eklemeden önce bu kısmı silebilirsiniz
