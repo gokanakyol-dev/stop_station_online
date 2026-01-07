@@ -1,3 +1,4 @@
+// FieldMapScreen - Modern Design v2.1 UPDATED
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   View,
@@ -15,7 +16,8 @@ import {
   getRouteWithDirection,
   approveStop,
   rejectStop,
-  addStop
+  addStop,
+  getOfflineQueueSize
 } from '../services/api';
 import {
   buildRouteSkeleton,
@@ -59,18 +61,31 @@ export default function FieldMapScreen({ route, navigation }) {
   const [mapSize, setMapSize] = useState('full'); // 'full' or 'minimized'
   const [selectedLocation, setSelectedLocation] = useState(null);
   const [selectedProjection, setSelectedProjection] = useState(null);
+  const [gpsAccuracy, setGpsAccuracy] = useState(null);
+  const [queueSize, setQueueSize] = useState(0);
+  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
+  const [stopToReject, setStopToReject] = useState(null);
   
   const mapRef = useRef(null);
   const locationSubscription = useRef(null);
 
   useEffect(() => {
     initializeMap();
+    checkQueue();
+    const interval = setInterval(checkQueue, 5000); // Her 5 saniyede kontrol
     return () => {
       if (locationSubscription.current) {
         locationSubscription.current.remove();
       }
+      clearInterval(interval);
     };
   }, []);
+
+  const checkQueue = async () => {
+    const size = await getOfflineQueueSize();
+    setQueueSize(size);
+  };
 
   const initializeMap = async () => {
     try {
@@ -114,8 +129,9 @@ export default function FieldMapScreen({ route, navigation }) {
   };
 
   const handleLocationUpdate = useCallback((location) => {
-    const { latitude, longitude } = location.coords;
+    const { latitude, longitude, accuracy } = location.coords;
     setUserLocation({ lat: latitude, lon: longitude });
+    setGpsAccuracy(accuracy);
 
     if (!skeleton) return;
 
@@ -151,19 +167,56 @@ export default function FieldMapScreen({ route, navigation }) {
   }, [skeleton, stops]);
 
   const handleApproveStop = async (stop) => {
+    console.log('[handleApproveStop] Start', { stopId: stop?.id, userLocation });
     try {
-      await approveStop(
+      let currentLocation = userLocation;
+      
+      // Eğer userLocation yoksa, anlık konum almayı dene (zorunlu değil)
+      if (!currentLocation) {
+        console.log('[handleApproveStop] No userLocation, trying to get current position...');
+        try {
+          const location = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.High,
+            timeout: 5000
+          });
+          currentLocation = {
+            lat: location.coords.latitude,
+            lon: location.coords.longitude
+          };
+          console.log('[handleApproveStop] Got current position:', currentLocation);
+        } catch (locError) {
+          console.warn('[handleApproveStop] Location not available, continuing without GPS:', locError.message);
+          // GPS olmadan devam et
+        }
+      }
+
+      // Konum bilgisi varsa ekle, yoksa null gönder
+      const locationData = currentLocation ? {
+        lat: currentLocation.lat,
+        lon: currentLocation.lon
+      } : null;
+
+      // Projeksiyon varsa ve locationData varsa ekle
+      if (locationData && projection) {
+        locationData.route_s = projection.route_s;
+        locationData.lateral_offset = projection.lateral_offset;
+        locationData.side = projection.side;
+      }
+
+      console.log('[handleApproveStop] Sending API call', { stopId: stop.id, locationData });
+      const result = await approveStop(
         stop.id,
         routeId,
         direction,
-        {
-          lat: userLocation.lat,
-          lon: userLocation.lon,
-          route_s: projection.route_s,
-          lateral_offset: projection.lateral_offset,
-          side: projection.side
-        }
+        locationData
       );
+      console.log('[handleApproveStop] API result', result);
+
+      if (result.offline) {
+        Alert.alert('⌛ Offline', 'Durak onayı kuyrukta. İnternet bağlantısında gönderilecek.');
+      } else {
+        Alert.alert('✅', 'Durak onaylandı');
+      }
 
       // Durağı yeşil yap
       setStops(stops.map(s =>
@@ -171,27 +224,64 @@ export default function FieldMapScreen({ route, navigation }) {
       ));
 
       setActiveStop(null);
-      Alert.alert('✅', 'Durak onaylandı');
     } catch (error) {
+      console.error('[handleApproveStop] Error', error);
       Alert.alert('Hata', error.message);
     }
   };
 
   const handleRejectStop = async (stop, reason) => {
+    console.log('[handleRejectStop] Start', { stopId: stop?.id, reason });
     try {
-      await rejectStop(
+      let currentLocation = userLocation;
+      
+      // Eğer userLocation yoksa, anlık konum almayı dene (zorunlu değil)
+      if (!currentLocation) {
+        console.log('[handleRejectStop] No userLocation, trying to get current position...');
+        try {
+          const location = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.High,
+            timeout: 5000
+          });
+          currentLocation = {
+            lat: location.coords.latitude,
+            lon: location.coords.longitude
+          };
+          console.log('[handleRejectStop] Got current position:', currentLocation);
+        } catch (locError) {
+          console.warn('[handleRejectStop] Location not available, continuing without GPS:', locError.message);
+          // GPS olmadan devam et
+        }
+      }
+
+      // Konum bilgisi varsa ekle, yoksa null gönder
+      const locationData = currentLocation ? {
+        lat: currentLocation.lat,
+        lon: currentLocation.lon
+      } : null;
+
+      // Projeksiyon varsa ve locationData varsa ekle
+      if (locationData && projection) {
+        locationData.route_s = projection.route_s;
+        locationData.lateral_offset = projection.lateral_offset;
+        locationData.side = projection.side;
+      }
+
+      console.log('[handleRejectStop] Sending API call', { stopId: stop.id, locationData, reason });
+      const result = await rejectStop(
         stop.id,
         routeId,
         direction,
-        {
-          lat: userLocation.lat,
-          lon: userLocation.lon,
-          route_s: projection.route_s,
-          lateral_offset: projection.lateral_offset,
-          side: projection.side
-        },
-        reason
+        locationData,
+        reason || 'Sebep belirtilmedi'
       );
+      console.log('[handleRejectStop] API result', result);
+
+      if (result.offline) {
+        Alert.alert('⌛ Offline', 'Durak reddi kuyrukta. İnternet bağlantısında gönderilecek.');
+      } else {
+        Alert.alert('❌', 'Durak reddedildi');
+      }
 
       // Durağı kırmızı yap
       setStops(stops.map(s =>
@@ -199,8 +289,11 @@ export default function FieldMapScreen({ route, navigation }) {
       ));
 
       setActiveStop(null);
-      Alert.alert('❌', 'Durak reddedildi');
+      setShowRejectModal(false);
+      setRejectReason('');
+      setStopToReject(null);
     } catch (error) {
+      console.error('[handleRejectStop] Error', error);
       Alert.alert('Hata', error.message);
     }
   };
@@ -234,23 +327,30 @@ export default function FieldMapScreen({ route, navigation }) {
     };
 
     try {
+      console.log('[handleAddStop] Sending API call', { routeId, direction, stopData, name: newStopName });
       const result = await addStop(
         routeId,
         direction,
         stopData,
         newStopName
       );
+      console.log('[handleAddStop] API result', result);
 
-      if (result.stop) {
+      if (result.offline) {
+        Alert.alert('⏳ Offline', 'Yeni durak kuyrukta. İnternet bağlantısında veritabanına eklenecek.');
+      } else if (result.stop) {
         setStops([...stops, result.stop]);
+        Alert.alert('✅', 'Yeni durak veritabanına eklendi');
+      } else {
+        Alert.alert('✅', 'Yeni durak eklendi');
       }
 
       setShowAddModal(false);
       setNewStopName('');
       setSelectedLocation(null);
       setSelectedProjection(null);
-      Alert.alert('✅', 'Yeni durak eklendi');
     } catch (error) {
+      console.error('[handleAddStop] Error', error);
       Alert.alert('Hata', error.message);
     }
   };
@@ -381,12 +481,24 @@ export default function FieldMapScreen({ route, navigation }) {
 
   return (
     <View style={styles.container}>
-      {/* Konum hatası banner */}
-      {locationError && (
-        <View style={styles.errorBanner}>
-          <Text style={styles.errorText}>{locationError}</Text>
+      {/* Basit Üst Bar */}
+      <View style={styles.topBar}>
+        <TouchableOpacity 
+          style={styles.backBtn}
+          onPress={() => navigation.goBack()}
+        >
+          <Text style={styles.backText}>←</Text>
+        </TouchableOpacity>
+        
+        <View style={styles.topBarCenter}>
+          <Text style={styles.routeNum}>{routeNumber}</Text>
+          <Text style={styles.routeTitle}>{routeName}</Text>
         </View>
-      )}
+        
+        <View style={styles.dirBadge}>
+          <Text style={styles.dirText}>{direction === 'gidis' ? '→' : '←'}</Text>
+        </View>
+      </View>
 
       {/* Harita */}
       <MapView
@@ -482,70 +594,80 @@ export default function FieldMapScreen({ route, navigation }) {
         )}
       </MapView>
 
-      {/* Üst bilgi paneli - Minimal */}
-      <View style={styles.topPanel}>
-        <TouchableOpacity 
-          style={styles.backButtonCircle}
-          onPress={() => navigation.goBack()}
-        >
-          <Text style={styles.backButtonText}>←</Text>
-        </TouchableOpacity>
-        
-        <View style={styles.routeInfoCard}>
-          <View style={{flex: 1}}>
-            <Text style={styles.routeInfo}>
-              {routeNumber} - {routeName}
-            </Text>
-            {projection && userLocation && (
-              <Text style={styles.routeName}>
-                📍 {projection.route_s.toFixed(0)}m • {projection.lateral_offset.toFixed(0)}m mesafe
-              </Text>
+      {/* Yakın Durak Kartı - Alt kısım */}
+      {upcomingStop && !activeStop && (
+        <View style={styles.nearbyStopCard}>
+          <View style={styles.stopCardHeader}>
+            <Text style={styles.stopCardLabel}>YAKIN DURAK</Text>
+            {upcomingStop.distance && (
+              <Text style={styles.stopDistance}>{upcomingStop.distance.toFixed(0)}m</Text>
             )}
           </View>
-          <View style={styles.directionBadge}>
-            <Text style={styles.directionBadgeText}>
-              {direction === 'gidis' ? '→' : '←'}
-            </Text>
-          </View>
-        </View>
-      </View>
-
-      {/* Durak detay modal - Bottom Sheet */}
-      {activeStop && (
-        <View style={styles.stopPanel}>
-          <Text style={styles.stopName}>{activeStop.name}</Text>
-          <Text style={styles.stopInfo}>
-            Route S: {activeStop.route_s?.toFixed(1)} m
-          </Text>
-
-          <View style={styles.buttonRow}>
+          
+          <Text style={styles.stopCardName} numberOfLines={2}>{upcomingStop.name || 'İsimsiz Durak'}</Text>
+          
+          <View style={styles.actionButtons}>
             <TouchableOpacity
-              style={[styles.actionButton, styles.approveButton]}
-              onPress={() => handleApproveStop(activeStop)}
+              style={styles.approveBtn}
+              onPress={() => handleApproveStop(upcomingStop)}
             >
-              <Text style={styles.buttonText}>✓ ONAYLA</Text>
+              <Text style={styles.approveBtnText}>✓ ONAYLA</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.actionButton, styles.rejectButton]}
+              style={styles.rejectBtn}
               onPress={() => {
-                Alert.prompt(
-                  'Durak Reddet',
-                  'Neden?',
-                  (reason) => handleRejectStop(activeStop, reason)
-                );
+                setStopToReject(upcomingStop);
+                setShowRejectModal(true);
               }}
             >
-              <Text style={styles.buttonText}>✗ REDDET</Text>
+              <Text style={styles.rejectBtnText}>✗ REDDET</Text>
             </TouchableOpacity>
           </View>
+        </View>
+      )}
 
-          <TouchableOpacity
-            style={styles.closeButton}
-            onPress={() => setActiveStop(null)}
-          >
-            <Text style={styles.closeButtonText}>Kapat</Text>
-          </TouchableOpacity>
+      {/* Durak Detay Modal */}
+      {activeStop && (
+        <View style={styles.nearbyStopCard}>
+          <View style={styles.stopCardHeader}>
+            <Text style={styles.stopCardLabel}>DURAK DETAY</Text>
+            <TouchableOpacity
+              style={styles.closeBtn}
+              onPress={() => setActiveStop(null)}
+            >
+              <Text style={styles.closeBtnText}>✕</Text>
+            </TouchableOpacity>
+          </View>
+          
+          <Text style={styles.stopCardName} numberOfLines={2}>{activeStop.name || 'İsimsiz Durak'}</Text>
+          <View style={styles.stopInfoRow}>
+            {activeStop.route_s != null && (
+              <Text style={styles.stopCardInfo}>Route S: {activeStop.route_s?.toFixed(0)}m</Text>
+            )}
+            {activeStop.id != null && (
+              <Text style={styles.stopIdBadge}>#{activeStop.id}</Text>
+            )}
+          </View>
+
+          <View style={styles.actionButtons}>
+            <TouchableOpacity
+              style={styles.approveBtn}
+              onPress={() => handleApproveStop(activeStop)}
+            >
+              <Text style={styles.approveBtnText}>✓ ONAYLA</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.rejectBtn}
+              onPress={() => {
+                setStopToReject(activeStop);
+                setShowRejectModal(true);
+              }}
+            >
+              <Text style={styles.rejectBtnText}>✗ REDDET</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       )}
 
@@ -577,12 +699,12 @@ export default function FieldMapScreen({ route, navigation }) {
               </View>
             )}
             
-            {projection && (
+            {projection && projection.route_s != null && (
               <View style={styles.locationInfo}>
                 <Text style={{fontWeight: 'bold', marginBottom: 4}}>📊 Rota Bilgisi:</Text>
-                <Text>Route S: {projection.route_s.toFixed(1)} m</Text>
-                <Text>Uzaklık: {projection.lateral_offset.toFixed(1)} m</Text>
-                <Text>Taraf: {projection.side === 'LEFT' ? 'SOL' : 'SAĞ'}</Text>
+                <Text>Route S: {projection.route_s?.toFixed(1) || '?'} m</Text>
+                <Text>Uzaklık: {projection.lateral_offset?.toFixed(1) || '?'} m</Text>
+                <Text>Taraf: {projection.side === 'LEFT' ? 'SOL' : projection.side === 'RIGHT' ? 'SAĞ' : '?'}</Text>
               </View>
             )}
 
@@ -610,6 +732,54 @@ export default function FieldMapScreen({ route, navigation }) {
                 onPress={handleAddStop}
               >
                 <Text style={styles.modalButtonText}>Ekle</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Durak Reddet Modal */}
+      <Modal
+        visible={showRejectModal}
+        animationType="slide"
+        transparent={true}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Durak Reddet</Text>
+            
+            {stopToReject && (
+              <View style={styles.locationInfo}>
+                <Text style={{fontWeight: 'bold', marginBottom: 4}}>📍 {stopToReject.name || 'İsimsiz Durak'}</Text>
+              </View>
+            )}
+
+            <TextInput
+              style={styles.input}
+              placeholder="Red nedeni yazın..."
+              value={rejectReason}
+              onChangeText={setRejectReason}
+              multiline
+              numberOfLines={3}
+            />
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => {
+                  setShowRejectModal(false);
+                  setRejectReason('');
+                  setStopToReject(null);
+                }}
+              >
+                <Text style={styles.modalButtonText}>İptal</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.modalButton, { backgroundColor: '#EF4444' }]}
+                onPress={() => handleRejectStop(stopToReject, rejectReason)}
+              >
+                <Text style={styles.modalButtonText}>Reddet</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -655,15 +825,262 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 13
   },
-  topPanel: {
+  topBar: {
     position: 'absolute',
-    top: 120,
+    top: 90,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(31, 41, 55, 0.95)',
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    zIndex: 100,
+    borderBottomWidth: 2,
+    borderBottomColor: '#10B981'
+  },
+  backBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(16, 185, 129, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12
+  },
+  backText: {
+    fontSize: 24,
+    color: '#10B981',
+    fontWeight: '700'
+  },
+  topBarCenter: {
+    flex: 1
+  },
+  routeNum: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#10B981',
+    marginBottom: 2
+  },
+  routeTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#FFFFFF'
+  },
+  dirBadge: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#10B981',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 8
+  },
+  dirText: {
+    fontSize: 22,
+    color: '#FFFFFF',
+    fontWeight: '700'
+  },
+  modernHeader: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    paddingTop: 50,
+    paddingBottom: 16,
+    paddingHorizontal: 16,
+    backgroundColor: 'rgba(31, 41, 55, 0.95)',
+    zIndex: 100,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(16, 185, 129, 0.3)'
+  },
+  backButton: {
+    position: 'absolute',
+    top: 50,
     left: 16,
-    right: 16,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 101
+  },
+  backIcon: {
+    fontSize: 24,
+    color: '#FFFFFF',
+    fontWeight: '700'
+  },
+  headerContent: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    zIndex: 10
+    marginTop: 8
+  },
+  routeBadge: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#10B981',
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  routeBadgeText: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#FFFFFF'
+  },
+  headerTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginBottom: 4
+  },
+  headerStats: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8
+  },
+  statText: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    fontWeight: '500'
+  },
+  directionBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12
+  },
+  gidisBadge: {
+    backgroundColor: 'rgba(16, 185, 129, 0.2)',
+    borderWidth: 1,
+    borderColor: '#10B981'
+  },
+  donusBadge: {
+    backgroundColor: 'rgba(245, 158, 11, 0.2)',
+    borderWidth: 1,
+    borderColor: '#F59E0B'
+  },
+  directionText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: 0.5
+  },
+  nearbyStopCard: {
+    position: 'absolute',
+    bottom: 20,
+    left: 16,
+    right: 16,
+    backgroundColor: 'rgba(31, 41, 55, 0.98)',
+    borderRadius: 20,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 20,
+    elevation: 16,
+    borderWidth: 2,
+    borderColor: '#10B981'
+  },
+  stopCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12
+  },
+  stopCardLabel: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#10B981',
+    letterSpacing: 1
+  },
+  stopDistance: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#10B981'
+  },
+  stopCardName: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginBottom: 12,
+    lineHeight: 26
+  },
+  stopInfoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16
+  },
+  stopCardInfo: {
+    fontSize: 14,
+    color: '#9CA3AF'
+  },
+  stopIdBadge: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#10B981',
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 8,
+    overflow: 'hidden'
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    gap: 12
+  },
+  approveBtn: {
+    flex: 1,
+    backgroundColor: '#10B981',
+    paddingVertical: 18,
+    borderRadius: 14,
+    alignItems: 'center',
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.5,
+    shadowRadius: 10,
+    elevation: 8
+  },
+  approveBtnText: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: 0.5
+  },
+  rejectBtn: {
+    flex: 1,
+    backgroundColor: '#EF4444',
+    paddingVertical: 18,
+    borderRadius: 14,
+    alignItems: 'center',
+    shadowColor: '#EF4444',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.5,
+    shadowRadius: 10,
+    elevation: 8
+  },
+  rejectBtnText: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: 0.5
+  },
+  closeBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(239, 68, 68, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#EF4444'
+  },
+  closeBtnText: {
+    fontSize: 18,
+    color: '#EF4444',
+    fontWeight: '700'
   },
   backButtonCircle: {
     width: 48,
@@ -912,22 +1329,24 @@ const styles = StyleSheet.create({
   },
   addButton: {
     position: 'absolute',
-    bottom: 40,
+    bottom: 240,
     right: 20,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     backgroundColor: '#10B981',
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#10B981',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-    elevation: 8
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.5,
+    shadowRadius: 16,
+    elevation: 12,
+    borderWidth: 3,
+    borderColor: 'rgba(255, 255, 255, 0.3)'
   },
   addButtonText: {
-    fontSize: 28,
+    fontSize: 32,
     fontWeight: '800',
     color: '#FFFFFF'
   },
@@ -1000,5 +1419,45 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: '#FFFFFF'
+  },
+  statusBanner: {
+    position: 'absolute',
+    top: 50,
+    left: 16,
+    right: 16,
+    backgroundColor: 'rgba(31, 41, 55, 0.95)',
+    borderRadius: 12,
+    padding: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    zIndex: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(75, 85, 99, 0.5)'
+  },
+  statusItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6
+  },
+  statusLabel: {
+    fontSize: 13,
+    color: '#9CA3AF',
+    fontWeight: '600'
+  },
+  statusValue: {
+    fontSize: 14,
+    fontWeight: '700'
+  },
+  statusGood: {
+    color: '#10B981'
+  },
+  statusWarn: {
+    color: '#F59E0B'
+  },
+  statusQueue: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#F59E0B'
   }
 });

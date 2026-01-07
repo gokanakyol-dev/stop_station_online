@@ -9,7 +9,7 @@ import {
   Alert,
   TextInput
 } from 'react-native';
-import { getRoutes } from '../services/api';
+import { getRoutes, getFieldActions, syncOfflineQueue, getOfflineQueueSize } from '../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const getCachedData = async (key) => {
@@ -28,9 +28,14 @@ export default function RouteSelectionScreen({ navigation }) {
   const [selectedRoute, setSelectedRoute] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isOffline, setIsOffline] = useState(false);
+  const [fieldActions, setFieldActions] = useState([]);
+  const [queueSize, setQueueSize] = useState(0);
+  const [showActions, setShowActions] = useState(false);
 
   useEffect(() => {
     loadRoutes();
+    loadRecentActions();
+    checkOfflineQueue();
   }, []);
 
   useEffect(() => {
@@ -106,6 +111,48 @@ export default function RouteSelectionScreen({ navigation }) {
     }
   }, []);
 
+  const loadRecentActions = async () => {
+    try {
+      const actions = await getFieldActions(10);
+      setFieldActions(actions || []);
+    } catch (error) {
+      console.log('Field actions load error:', error);
+    }
+  };
+
+  const checkOfflineQueue = async () => {
+    const size = await getOfflineQueueSize();
+    setQueueSize(size);
+  };
+
+  const handleSyncQueue = async () => {
+    if (queueSize === 0) return;
+    
+    Alert.alert(
+      'Senkronizasyon',
+      `${queueSize} bekleyen aksiyon senkronize edilsin mi?`,
+      [
+        { text: 'İptal', style: 'cancel' },
+        {
+          text: 'Senkronize Et',
+          onPress: async () => {
+            const results = await syncOfflineQueue();
+            const success = results.filter(r => r.success).length;
+            const failed = results.filter(r => !r.success).length;
+            
+            Alert.alert(
+              'Senkronizasyon Tamamlandı',
+              `✅ ${success} başarılı\n❌ ${failed} başarısız`
+            );
+            
+            await checkOfflineQueue();
+            await loadRecentActions();
+          }
+        }
+      ]
+    );
+  };
+
   const selectDirection = useCallback((route, direction) => {
     navigation.navigate('FieldMap', {
       routeId: route.id,
@@ -171,9 +218,21 @@ export default function RouteSelectionScreen({ navigation }) {
         <Text style={styles.title}>DURAK DOĞRULAMA</Text>
         <View style={styles.subtitleRow}>
           <Text style={styles.subtitle}>Hat ve yön seçin</Text>
-          <Text style={styles.version}>v1.1</Text>
+          <Text style={styles.version}>v1.2</Text>
         </View>
       </View>
+
+      {/* Offline Queue Banner */}
+      {queueSize > 0 && (
+        <TouchableOpacity 
+          style={styles.queueBanner}
+          onPress={handleSyncQueue}
+        >
+          <Text style={styles.queueBannerText}>
+            📤 {queueSize} bekleyen aksiyon - Senkronize etmek için dokun
+          </Text>
+        </TouchableOpacity>
+      )}
 
       {isOffline && (
         <View style={styles.offlineBanner}>
@@ -201,13 +260,53 @@ export default function RouteSelectionScreen({ navigation }) {
         )}
       </View>
 
+      {/* Recent Actions Toggle */}
+      {fieldActions.length > 0 && (
+        <TouchableOpacity
+          style={styles.actionsToggle}
+          onPress={() => setShowActions(!showActions)}
+        >
+          <Text style={styles.actionsToggleText}>
+            {showActions ? '📋 Son Aksiyonları Gizle' : '📋 Son Aksiyonları Göster'}
+          </Text>
+        </TouchableOpacity>
+      )}
+
+      {/* Recent Actions List */}
+      {showActions && (
+        <View style={styles.actionsContainer}>
+          <Text style={styles.actionsTitle}>SON AKSİYONLAR</Text>
+          {fieldActions.slice(0, 5).map((action, index) => (
+            <View key={index} style={styles.actionItem}>
+              <View style={styles.actionIcon}>
+                <Text style={styles.actionIconText}>
+                  {action.action_type === 'approve' ? '✅' : 
+                   action.action_type === 'reject' ? '❌' : '➕'}
+                </Text>
+              </View>
+              <View style={styles.actionInfo}>
+                <Text style={styles.actionRoute}>{action.route_number}</Text>
+                <Text style={styles.actionStop}>{action.stop_name || action.stop_id}</Text>
+                <Text style={styles.actionTime}>
+                  {new Date(action.timestamp).toLocaleString('tr-TR')}
+                </Text>
+              </View>
+            </View>
+          ))}
+        </View>
+      )}
+
       <FlatList
         data={filteredRoutes}
         keyExtractor={(item) => item.id.toString()}
         renderItem={renderRouteItem}
         contentContainerStyle={styles.listContent}
         refreshing={loading}
-        onRefresh={loadRoutes}
+        onRefresh={() => {
+          loadRoutes();
+          loadRecentActions();
+          checkOfflineQueue();
+        }}
         removeClippedSubviews={true}
         maxToRenderPerBatch={10}
         updateCellsBatchingPeriod={50}
@@ -244,7 +343,7 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: '#1F2937',
     padding: 20,
-    paddingTop: 60,
+    paddingTop: 140,
     paddingBottom: 28,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
@@ -414,5 +513,83 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#FFFFFF',
     letterSpacing: 0.8
+  },
+  queueBanner: {
+    backgroundColor: '#F59E0B',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#D97706'
+  },
+  queueBannerText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
+    textAlign: 'center'
+  },
+  actionsToggle: {
+    backgroundColor: '#374151',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    marginHorizontal: 16,
+    marginTop: 12,
+    borderRadius: 8
+  },
+  actionsToggleText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center'
+  },
+  actionsContainer: {
+    backgroundColor: '#1F2937',
+    marginHorizontal: 16,
+    marginTop: 8,
+    marginBottom: 8,
+    borderRadius: 12,
+    padding: 12
+  },
+  actionsTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#10B981',
+    marginBottom: 10,
+    letterSpacing: 0.5
+  },
+  actionItem: {
+    flexDirection: 'row',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(75, 85, 99, 0.3)'
+  },
+  actionIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#374151',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12
+  },
+  actionIconText: {
+    fontSize: 16
+  },
+  actionInfo: {
+    flex: 1
+  },
+  actionRoute: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginBottom: 2
+  },
+  actionStop: {
+    fontSize: 13,
+    color: '#9CA3AF',
+    marginBottom: 2
+  },
+  actionTime: {
+    fontSize: 11,
+    color: '#6B7280'
   }
 });

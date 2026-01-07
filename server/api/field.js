@@ -7,6 +7,8 @@ export const fieldRoutes = (app) => {
     try {
       const { stop_id, route_id, direction, user_id, location } = req.body;
       
+      console.log('[approve] Received:', { stop_id, route_id, direction, user_id, location });
+      
       const { data, error } = await supabase
         .from('field_actions')
         .insert([{
@@ -15,16 +17,19 @@ export const fieldRoutes = (app) => {
           route_id,
           direction,
           user_id,
-          field_lat: location.lat,
-          field_lon: location.lon,
-          route_s: location.route_s,
-          lateral_offset: location.lateral_offset,
-          side: location.side,
+          field_lat: location?.lat ?? null,
+          field_lon: location?.lon ?? null,
+          route_s: location?.route_s ?? null,
+          lateral_offset: location?.lateral_offset ?? null,
+          side: location?.side ?? null,
           timestamp: new Date().toISOString()
         }])
         .select();
       
-      if (error) throw error;
+      if (error) {
+        console.error('[approve] Supabase error:', error);
+        throw error;
+      }
 
       // Durağı onaylandı olarak işaretle
       await supabase
@@ -32,8 +37,10 @@ export const fieldRoutes = (app) => {
         .update({ field_verified: true, last_verified_at: new Date().toISOString() })
         .eq('id', stop_id);
 
+      console.log('[approve] Success:', data[0]);
       res.json({ status: 'ok', action: data[0] });
     } catch (err) {
+      console.error('[approve] Error:', err.message);
       res.status(500).json({ error: err.message });
     }
   });
@@ -43,6 +50,8 @@ export const fieldRoutes = (app) => {
     try {
       const { stop_id, route_id, direction, user_id, location, reason } = req.body;
       
+      console.log('[reject] Received:', { stop_id, route_id, direction, user_id, location, reason });
+      
       const { data, error } = await supabase
         .from('field_actions')
         .insert([{
@@ -51,17 +60,20 @@ export const fieldRoutes = (app) => {
           route_id,
           direction,
           user_id,
-          field_lat: location.lat,
-          field_lon: location.lon,
-          route_s: location.route_s,
-          lateral_offset: location.lateral_offset,
-          side: location.side,
+          field_lat: location?.lat ?? null,
+          field_lon: location?.lon ?? null,
+          route_s: location?.route_s ?? null,
+          lateral_offset: location?.lateral_offset ?? null,
+          side: location?.side ?? null,
           notes: reason,
           timestamp: new Date().toISOString()
         }])
         .select();
       
-      if (error) throw error;
+      if (error) {
+        console.error('[reject] Supabase error:', error);
+        throw error;
+      }
 
       // Durağı reddedildi olarak işaretle
       await supabase
@@ -69,8 +81,10 @@ export const fieldRoutes = (app) => {
         .update({ field_verified: false, field_rejected: true })
         .eq('id', stop_id);
 
+      console.log('[reject] Success:', data[0]);
       res.json({ status: 'ok', action: data[0] });
     } catch (err) {
+      console.error('[reject] Error:', err.message);
       res.status(500).json({ error: err.message });
     }
   });
