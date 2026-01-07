@@ -316,6 +316,7 @@
               </div>
               <div class="col-md-5 d-flex align-items-end gap-2">
                 <button id="fieldRefreshBtn" class="btn btn-primary">🗺️ Haritada Göster</button>
+                <button id="fieldManualRefreshBtn" class="btn btn-info">🔄 Verileri Yenile</button>
                 <button id="fieldDownloadBtn" class="btn btn-success">📥 CSV İndir</button>
               </div>
             </div>
@@ -325,18 +326,10 @@
         <!-- İstatistikler -->
         <div class="row mb-3">
           <div class="col-md-2">
-            <div class="card bg-primary text-white">
-              <div class="card-body text-center">
-                <h3 id="fieldStatStops">0</h3>
-                <p class="mb-0">Durak</p>
-              </div>
-            </div>
-          </div>
-          <div class="col-md-2">
             <div class="card bg-success text-white">
               <div class="card-body text-center">
                 <h3 id="fieldStatApprove">0</h3>
-                <p class="mb-0">Onaylanan</p>
+                <p class="mb-0">✅ Onaylanan</p>
               </div>
             </div>
           </div>
@@ -344,7 +337,15 @@
             <div class="card bg-danger text-white">
               <div class="card-body text-center">
                 <h3 id="fieldStatReject">0</h3>
-                <p class="mb-0">Reddedilen</p>
+                <p class="mb-0">❌ Reddedilen</p>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-2">
+            <div class="card bg-warning text-white">
+              <div class="card-body text-center">
+                <h3 id="fieldStatPending">0</h3>
+                <p class="mb-0">⏳ Beklemede</p>
               </div>
             </div>
           </div>
@@ -352,15 +353,23 @@
             <div class="card bg-info text-white">
               <div class="card-body text-center">
                 <h3 id="fieldStatAdd">0</h3>
-                <p class="mb-0">Eklenen</p>
+                <p class="mb-0">➕ Eklenen</p>
               </div>
             </div>
           </div>
-          <div class="col-md-4">
+          <div class="col-md-2">
+            <div class="card bg-primary text-white">
+              <div class="card-body text-center">
+                <h3 id="fieldStatStops">0</h3>
+                <p class="mb-0">📍 Toplam Durak</p>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-2">
             <div class="card bg-dark text-white">
               <div class="card-body text-center">
                 <h3 id="fieldStatTotal">0</h3>
-                <p class="mb-0">Toplam İşlem</p>
+                <p class="mb-0">📊 İşlem Sayısı</p>
               </div>
             </div>
           </div>

@@ -41,6 +41,24 @@ import { supabase } from './supabaseClient.js';
 routeRoutes(app);
 fieldRoutes(app);
 
+// ✅ Tüm durakları getir (Saha Kontrol Paneli için)
+app.get('/api/stops', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('stops')
+      .select('id, route_id, direction, name, lat, lon, field_verified, field_rejected, last_verified_at')
+      .order('route_id', { ascending: true })
+      .order('sequence_number', { ascending: true });
+    
+    if (error) throw error;
+    
+    res.json({ stops: data || [] });
+  } catch (err) {
+    console.error('[GET /api/stops] Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Pipeline fonksiyonunu asenkron yükle
 let runStep1Pipeline = null;
 import('../public/pipeline/index.js')

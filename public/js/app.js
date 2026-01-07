@@ -1374,6 +1374,7 @@ let fieldMap = null;
 let fieldMarkersLayer = null;
 let fieldRouteLayer = null;
 let fieldActions = [];
+let fieldAutoRefreshInterval = null; // ✅ Otomatik yenileme için
 
 window.loadFieldData = async function() {
   console.log('🔄 Saha kontrol paneli yükleniyor...');
@@ -1401,6 +1402,21 @@ window.loadFieldData = async function() {
   // Field actions'ları yükle
   await loadFieldActions();
   
+  // ✅ Otomatik yenileme başlat (30 saniyede bir)
+  if (fieldAutoRefreshInterval) {
+    clearInterval(fieldAutoRefreshInterval);
+  }
+  fieldAutoRefreshInterval = setInterval(async () => {
+    console.log('🔄 Otomatik yenileniyor...');
+    await loadFieldActions();
+    const routeId = document.getElementById('fieldRouteFilter').value;
+    if (routeId) {
+      await loadRouteOnFieldMap(routeId);
+    }
+  }, 30000); // 30 saniye
+  
+  console.log('✅ Otomatik yenileme aktif (30 saniyede bir)');
+  
   // Event listeners
   document.getElementById('fieldRefreshBtn').addEventListener('click', async () => {
     const routeId = document.getElementById('fieldRouteFilter').value;
@@ -1408,6 +1424,16 @@ window.loadFieldData = async function() {
       await loadRouteOnFieldMap(routeId);
     } else {
       alert('Lütfen önce bir hat seçin');
+    }
+  });
+  
+  // ✅ Manuel yenileme butonu
+  document.getElementById('fieldManualRefreshBtn').addEventListener('click', async () => {
+    console.log('🔄 Manuel yenileme başlatıldı...');
+    await loadFieldActions();
+    const routeId = document.getElementById('fieldRouteFilter').value;
+    if (routeId) {
+      await loadRouteOnFieldMap(routeId);
     }
   });
   
@@ -1426,9 +1452,17 @@ window.loadFieldData = async function() {
 
 async function loadFieldActions() {
   try {
-    const res = await fetch(`${API_BASE}/api/field-actions`);
-    const data = await res.json();
-    let actions = data.actions || [];
+    // ✅ Hem field_actions hem de stops verilerini çek
+    const [actionsRes, stopsRes] = await Promise.all([
+      fetch(`${API_BASE}/api/field-actions`),
+      fetch(`${API_BASE}/api/stops`)
+    ]);
+    
+    const actionsData = await actionsRes.json();
+    const stopsData = await stopsRes.json();
+    
+    let actions = actionsData.actions || [];
+    const allStops = stopsData.stops || [];
     
     // Filtreleri uygula
     const routeFilter = document.getElementById('fieldRouteFilter')?.value;
@@ -1447,27 +1481,39 @@ async function loadFieldActions() {
     
     fieldActions = actions;
     
-    // İstatistikleri güncelle
-    const totalStops = new Set(actions.map(a => a.stop_id)).size;
-    const approved = actions.filter(a => a.action === 'APPROVE').length;
-    const rejected = actions.filter(a => a.action === 'REJECT').length;
-    const added = actions.filter(a => a.action === 'ADD').length;
+    // ✅ İSTATİSTİKLERİ STOPS TABLOSUNDAN HESAPLA (GÜNCEL DURUM)
+    let filteredStops = allStops;
+    if (routeFilter) {
+      filteredStops = filteredStops.filter(s => s.route_id == routeFilter);
+    }
+    if (directionFilter) {
+      filteredStops = filteredStops.filter(s => s.direction === directionFilter);
+    }
+    
+    const totalStops = filteredStops.length;
+    const approved = filteredStops.filter(s => s.field_verified === true).length;
+    const rejected = filteredStops.filter(s => s.field_rejected === true).length;
+    const pending = totalStops - approved - rejected;
+    const addedCount = actions.filter(a => a.action === 'ADD').length;
     
     document.getElementById('fieldStatStops').textContent = totalStops;
     document.getElementById('fieldStatApprove').textContent = approved;
     document.getElementById('fieldStatReject').textContent = rejected;
-    document.getElementById('fieldStatAdd').textContent = added;
+    document.getElementById('fieldStatPending').textContent = pending; // ✅ Beklemede
+    document.getElementById('fieldStatAdd').textContent = addedCount;
     document.getElementById('fieldStatTotal').textContent = actions.length;
     
+    console.log(`📊 İstatistikler: ${totalStops} durak, ${approved} onaylı, ${rejected} reddedildi, ${pending} beklemede`);
+    
     // Listeyi güncelle
-    renderFieldActions(actions);
+    renderFieldActions(actions, allStops);
   } catch (err) {
     console.error('Field actions yüklenemedi:', err);
     document.getElementById('fieldActionsList').innerHTML = `<p class="text-danger">Veri yüklenemedi: ${err.message}</p>`;
   }
 }
 
-function renderFieldActions(actions) {
+function renderFieldActions(actions, allStops = []) {
   const list = document.getElementById('fieldActionsList');
   
   if (actions.length === 0) {
@@ -1481,6 +1527,25 @@ function renderFieldActions(actions) {
   list.innerHTML = display.map(action => {
     const route = allRoutes.find(r => r.id === action.route_id);
     const routeNumber = route?.route_number || '?';
+    
+    // ✅ Durağın GÜNCEL DURUMUNU KONTROL ET
+    const currentStop = allStops.find(s => s.id === action.stop_id);
+    let currentStatus = '';
+    let currentStatusBadge = '';
+    
+    if (currentStop) {
+      if (currentStop.field_verified) {
+        currentStatus = ' (Şu an: ✅ Onaylı)';
+        currentStatusBadge = '<span class="badge bg-success ms-2">✅ Onaylı</span>';
+      } else if (currentStop.field_rejected) {
+        currentStatus = ' (Şu an: ❌ Reddedildi)';
+        currentStatusBadge = '<span class="badge bg-danger ms-2">❌ Reddedildi</span>';
+      } else {
+        currentStatus = ' (Şu an: ⏳ Beklemede)';
+        currentStatusBadge = '<span class="badge bg-warning ms-2">⏳ Beklemede</span>';
+      }
+    }
+    
     const actionColor = action.action === 'APPROVE' ? 'success' : action.action === 'REJECT' ? 'danger' : 'info';
     const actionIcon = action.action === 'APPROVE' ? '✅' : action.action === 'REJECT' ? '❌' : '➕';
     const actionText = action.action === 'APPROVE' ? 'Onaylandı' : action.action === 'REJECT' ? 'Reddedildi' : 'Eklendi';
@@ -1492,6 +1557,7 @@ function renderFieldActions(actions) {
             <span class="badge bg-primary">${routeNumber}</span>
             <span class="badge bg-${action.direction === 'gidis' ? 'info' : 'warning'}">${action.direction === 'gidis' ? 'Gidiş' : 'Dönüş'}</span>
             <strong>${action.stop_name || 'Durak'}</strong>
+            ${currentStatusBadge}
           </div>
           <span class="badge bg-${actionColor}">${actionIcon} ${actionText}</span>
         </div>
@@ -1510,7 +1576,8 @@ function renderFieldActions(actions) {
 
 async function loadRouteOnFieldMap(routeId) {
   try {
-    const res = await fetch(`${API_BASE}/api/routes/${routeId}/direction/gidis`);
+    const directionFilter = document.getElementById('fieldDirectionFilter').value || 'gidis';
+    const res = await fetch(`${API_BASE}/api/routes/${routeId}/direction/${directionFilter}`);
     const data = await res.json();
     
     fieldMarkersLayer.clearLayers();
@@ -1522,18 +1589,39 @@ async function loadRouteOnFieldMap(routeId) {
       fieldMap.fitBounds(L.latLngBounds(data.route.polyline).pad(0.1));
     }
     
-    // Durakları göster
+    // Durakları güncel durumlarıyla göster
     data.stops.forEach(stop => {
+      // ✅ GÜNCEL DURUMA GÖRE RENK SEÇME
+      let fillColor = '#FFD60A'; // Sarı: Beklemede
+      let opacity = 1.0;
+      let statusText = 'Beklemede';
+      
+      if (stop.field_verified) {
+        fillColor = '#34C759'; // Yeşil: Onaylandı
+        statusText = '✅ Onaylandı';
+      } else if (stop.field_rejected) {
+        fillColor = '#9CA3AF'; // Gri: Reddedildi
+        opacity = 0.5;
+        statusText = '❌ Reddedildi';
+      }
+      
       const marker = L.circleMarker([stop.lat, stop.lon], {
         radius: 8,
-        fillColor: '#10b981',
+        fillColor: fillColor,
         color: 'white',
         weight: 2,
-        fillOpacity: 0.8
+        fillOpacity: opacity
       }).addTo(fieldMarkersLayer);
       
-      marker.bindPopup(`<strong>${stop.name}</strong><br>${stop.lat.toFixed(6)}, ${stop.lon.toFixed(6)}`);
+      marker.bindPopup(`
+        <strong>${stop.name}</strong><br>
+        Durum: ${statusText}<br>
+        Konum: ${stop.lat.toFixed(6)}, ${stop.lon.toFixed(6)}<br>
+        ${stop.last_verified_at ? `Son: ${new Date(stop.last_verified_at).toLocaleString('tr-TR')}` : ''}
+      `);
     });
+    
+    console.log(`✅ ${data.stops.length} durak haritaya eklendi (güncel durumlarıyla)`);
   } catch (err) {
     console.error('Rota yüklenemedi:', err);
   }

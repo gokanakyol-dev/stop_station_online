@@ -203,6 +203,19 @@ export default function FieldMapScreen({ route, navigation }) {
         locationData.side = projection.side;
       }
 
+      // ✅ Optimistic update - UI'yi hemen güncelle
+      setStops(stops.map(s =>
+        s.id === stop.id ? { ...s, field_verified: true, field_rejected: false } : s
+      ));
+      if (upcomingStop?.id === stop.id) {
+        setUpcomingStop({ ...upcomingStop, field_verified: true, field_rejected: false });
+      }
+      
+      // Kullanıcı renk değişimini görsün diye kısa gecikme
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      setActiveStop(null);
+
       console.log('[handleApproveStop] Sending API call', { stopId: stop.id, locationData });
       const result = await approveStop(
         stop.id,
@@ -217,13 +230,6 @@ export default function FieldMapScreen({ route, navigation }) {
       } else {
         Alert.alert('✅', 'Durak onaylandı');
       }
-
-      // Durağı yeşil yap
-      setStops(stops.map(s =>
-        s.id === stop.id ? { ...s, field_verified: true } : s
-      ));
-
-      setActiveStop(null);
     } catch (error) {
       console.error('[handleApproveStop] Error', error);
       Alert.alert('Hata', error.message);
@@ -267,6 +273,22 @@ export default function FieldMapScreen({ route, navigation }) {
         locationData.side = projection.side;
       }
 
+      // ✅ Optimistic update - UI'yi hemen güncelle
+      setStops(stops.map(s =>
+        s.id === stop.id ? { ...s, field_rejected: true, field_verified: false } : s
+      ));
+      if (upcomingStop?.id === stop.id) {
+        setUpcomingStop({ ...upcomingStop, field_rejected: true, field_verified: false });
+      }
+      
+      // Kullanıcı renk değişimini görsün diye kısa gecikme
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      setActiveStop(null);
+      setShowRejectModal(false);
+      setRejectReason('');
+      setStopToReject(null);
+
       console.log('[handleRejectStop] Sending API call', { stopId: stop.id, locationData, reason });
       const result = await rejectStop(
         stop.id,
@@ -282,16 +304,6 @@ export default function FieldMapScreen({ route, navigation }) {
       } else {
         Alert.alert('❌', 'Durak reddedildi');
       }
-
-      // Durağı kırmızı yap
-      setStops(stops.map(s =>
-        s.id === stop.id ? { ...s, field_rejected: true } : s
-      ));
-
-      setActiveStop(null);
-      setShowRejectModal(false);
-      setRejectReason('');
-      setStopToReject(null);
     } catch (error) {
       console.error('[handleRejectStop] Error', error);
       Alert.alert('Hata', error.message);
@@ -539,10 +551,11 @@ export default function FieldMapScreen({ route, navigation }) {
             key={stop.id}
             coordinate={{ latitude: stop.lat, longitude: stop.lon }}
             pinColor={
-              stop.field_verified ? '#34C759' :
-              stop.field_rejected ? '#FF3B30' :
-              '#FFD60A'
+              stop.field_verified ? '#34C759' :  // ✅ Yeşil - Onaylanmış
+              stop.field_rejected ? '#9CA3AF' :  // ⚫ Gri - Reddedilmiş (pasif)
+              '#FFD60A'                          // 🟡 Sarı - Bekliyor
             }
+            opacity={stop.field_rejected ? 0.5 : 1.0} // Reddedilenler %50 şeffaf
             onPress={() => setActiveStop(stop)}
           />
         ))}
